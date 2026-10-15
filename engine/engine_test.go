@@ -178,3 +178,16 @@ func TestStackingEndsGame(t *testing.T) {
 	}
 	t.Error("dropping every piece in the same column should end the game")
 }
+
+func TestApplyDoesNotFall(t *testing.T) {
+	g := New(1)
+	y := g.State().Piece.Y
+	g.Apply(Left)
+	if p := g.State().Piece; p.Y != y || p.X != 2 {
+		t.Errorf("Apply(Left) moved the piece to %+v, want x=2 y=%d", p, y)
+	}
+	g.Gravity()
+	if g.State().Piece.Y != y-1 {
+		t.Error("Gravity did not drop the piece one row")
+	}
+}

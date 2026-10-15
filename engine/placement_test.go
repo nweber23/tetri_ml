@@ -54,3 +54,17 @@ func TestPlacementsOnlyGameEnds(t *testing.T) {
 		t.Error("finished game should have no placements")
 	}
 }
+
+func TestLanding(t *testing.T) {
+	g := New(1)
+	g.cur = spawnPiece(O)
+	p := g.Landing(Placement{Rot: 0, X: 0})
+	for _, c := range p.Cells() {
+		if c.Y > 1 {
+			t.Errorf("O should rest on the floor, cell %v", c)
+		}
+	}
+	if g.board.fits(Piece{O, 0, p.X, p.Y - 1}) {
+		t.Error("landing piece could still fall")
+	}
+}

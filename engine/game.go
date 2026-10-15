@@ -67,6 +67,19 @@ func (g *Game) Step(a Action) (reward int, done bool) {
 	if g.done {
 		return 0, true
 	}
+	reward, locked := g.Apply(a)
+	if !locked {
+		reward = g.Gravity()
+	}
+	return reward, g.done
+}
+
+// Apply performs only the action, without gravity. It reports whether the
+// piece was locked, which only HardDrop does.
+func (g *Game) Apply(a Action) (reward int, locked bool) {
+	if g.done {
+		return 0, false
+	}
 	switch a {
 	case Left:
 		g.tryMove(-1, 0)
@@ -79,12 +92,17 @@ func (g *Game) Step(a Action) (reward int, done bool) {
 	case HardDrop:
 		for g.tryMove(0, -1) {
 		}
-		return g.lock(), g.done
+		return g.lock(), true
 	}
-	if !g.tryMove(0, -1) {
-		reward = g.lock()
+	return 0, false
+}
+
+// Gravity performs one gravity tick and returns the reward if the piece locked.
+func (g *Game) Gravity() int {
+	if g.done || g.tryMove(0, -1) {
+		return 0
 	}
-	return reward, g.done
+	return g.lock()
 }
 
 func (g *Game) tryMove(dx, dy int) bool {

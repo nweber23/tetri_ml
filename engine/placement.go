@@ -47,20 +47,24 @@ func (g *Game) Place(pl Placement) (reward int, done bool) {
 	return g.Step(HardDrop)
 }
 
-// Afterstate returns the board after dropping the current piece at pl and
-// clearing lines, plus the number of lines cleared. The game is not changed.
-func (g *Game) Afterstate(pl Placement) (Board, int) {
-	b := g.board
+// Landing returns where the current piece comes to rest when dropped at pl.
+func (g *Game) Landing(pl Placement) Piece {
 	p := spawnPiece(g.cur.Kind)
 	p.Rot, p.X = pl.Rot, pl.X
 	for {
 		q := p
 		q.Y--
-		if !b.fits(q) {
-			break
+		if !g.board.fits(q) {
+			return p
 		}
 		p = q
 	}
-	b.place(p)
+}
+
+// Afterstate returns the board after dropping the current piece at pl and
+// clearing lines, plus the number of lines cleared. The game is not changed.
+func (g *Game) Afterstate(pl Placement) (Board, int) {
+	b := g.board
+	b.place(g.Landing(pl))
 	return b, b.clearLines()
 }
