@@ -56,10 +56,15 @@ def best_action(net: ValueNet, features, mask) -> int:
     return int(values.argmax())
 
 
-def update(net, target_net, optimizer, batch, gamma: float) -> float:
+def update(net, target_net, optimizer, batch, gamma: float, double: bool = False) -> float:
     features, reward, done, next_features, next_mask = batch
     with torch.no_grad():
-        next_value = target_net(next_features).masked_fill(~next_mask, -torch.inf).max(dim=1).values
+        target_values = target_net(next_features)
+        if double:  # Double DQN: the online net picks the next placement, the target net values it
+            pick = net(next_features).masked_fill(~next_mask, -torch.inf).argmax(dim=1, keepdim=True)
+            next_value = target_values.gather(1, pick).squeeze(1)
+        else:
+            next_value = target_values.masked_fill(~next_mask, -torch.inf).max(dim=1).values
         target = reward + gamma * torch.where(done, torch.zeros_like(next_value), next_value)
     loss = nn.functional.smooth_l1_loss(net(features), target)
     optimizer.zero_grad()

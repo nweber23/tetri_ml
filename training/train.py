@@ -35,6 +35,7 @@ def main():
     p.add_argument("--reward", choices=["raw", "shaped"], default="raw")
     p.add_argument("--hole-penalty", type=float, default=0.5)
     p.add_argument("--height-penalty", type=float, default=0.05)
+    p.add_argument("--double", action="store_true", help="Double DQN targets")
     p.add_argument("--steps", type=int, default=100_000)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--gamma", type=float, default=0.99)
@@ -85,7 +86,7 @@ def main():
         episode_score += score_gain
 
         if replay.size >= args.warmup:
-            loss = update(net, target_net, optimizer, replay.sample(args.batch, rng), args.gamma)
+            loss = update(net, target_net, optimizer, replay.sample(args.batch, rng), args.gamma, args.double)
             if step % 100 == 0:
                 writer.add_scalar("train/loss", loss, step)
         if step % args.target_every == 0:
