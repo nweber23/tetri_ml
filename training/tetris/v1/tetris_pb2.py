@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16tetris/v1/tetris.proto\x12\ttetris.v1\"]\n\x07Request\x12!\n\x05start\x18\x01 \x01(\x0b\x32\x10.tetris.v1.ResetH\x00\x12%\n\x05place\x18\x02 \x01(\x0b\x32\x14.tetris.v1.PlacementH\x00\x42\x08\n\x06\x61\x63tion\"\x15\n\x05Reset\x12\x0c\n\x04seed\x18\x01 \x01(\x04\"#\n\tPlacement\x12\x0b\n\x03rot\x18\x01 \x01(\x05\x12\t\n\x01x\x18\x02 \x01(\x05\"e\n\x08Response\x12\x1f\n\x05state\x18\x01 \x01(\x0b\x32\x10.tetris.v1.State\x12\x0e\n\x06reward\x18\x02 \x01(\x05\x12(\n\nplacements\x18\x03 \x03(\x0b\x32\x14.tetris.v1.Placement\"o\n\x05State\x12\r\n\x05\x62oard\x18\x01 \x01(\x0c\x12\r\n\x05piece\x18\x02 \x01(\x05\x12\x0c\n\x04next\x18\x03 \x01(\x05\x12\r\n\x05score\x18\x04 \x01(\x05\x12\r\n\x05lines\x18\x05 \x01(\x05\x12\x0e\n\x06pieces\x18\x06 \x01(\x05\x12\x0c\n\x04\x64one\x18\x07 \x01(\x08\x32=\n\x06Tetris\x12\x33\n\x04Play\x12\x12.tetris.v1.Request\x1a\x13.tetris.v1.Response(\x01\x30\x01\x42\x37Z5github.com/nweber23/tetri_ml/proto/tetris/v1;tetrisv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16tetris/v1/tetris.proto\x12\ttetris.v1\"]\n\x07Request\x12!\n\x05start\x18\x01 \x01(\x0b\x32\x10.tetris.v1.ResetH\x00\x12%\n\x05place\x18\x02 \x01(\x0b\x32\x14.tetris.v1.PlacementH\x00\x42\x08\n\x06\x61\x63tion\"\x15\n\x05Reset\x12\x0c\n\x04seed\x18\x01 \x01(\x04\"#\n\tPlacement\x12\x0b\n\x03rot\x18\x01 \x01(\x05\x12\t\n\x01x\x18\x02 \x01(\x05\"\x91\x01\n\x08Response\x12\x1f\n\x05state\x18\x01 \x01(\x0b\x32\x10.tetris.v1.State\x12\x0e\n\x06reward\x18\x02 \x01(\x05\x12(\n\nplacements\x18\x03 \x03(\x0b\x32\x14.tetris.v1.Placement\x12*\n\x0b\x61\x66terstates\x18\x04 \x03(\x0b\x32\x15.tetris.v1.Afterstate\"W\n\nAfterstate\x12\x18\n\x10\x61ggregate_height\x18\x01 \x01(\x05\x12\r\n\x05holes\x18\x02 \x01(\x05\x12\x11\n\tbumpiness\x18\x03 \x01(\x05\x12\r\n\x05lines\x18\x04 \x01(\x05\"o\n\x05State\x12\r\n\x05\x62oard\x18\x01 \x01(\x0c\x12\r\n\x05piece\x18\x02 \x01(\x05\x12\x0c\n\x04next\x18\x03 \x01(\x05\x12\r\n\x05score\x18\x04 \x01(\x05\x12\r\n\x05lines\x18\x05 \x01(\x05\x12\x0e\n\x06pieces\x18\x06 \x01(\x05\x12\x0c\n\x04\x64one\x18\x07 \x01(\x08\x32=\n\x06Tetris\x12\x33\n\x04Play\x12\x12.tetris.v1.Request\x1a\x13.tetris.v1.Response(\x01\x30\x01\x42\x37Z5github.com/nweber23/tetri_ml/proto/tetris/v1;tetrisv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -38,10 +38,12 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_RESET']._serialized_end=153
   _globals['_PLACEMENT']._serialized_start=155
   _globals['_PLACEMENT']._serialized_end=190
-  _globals['_RESPONSE']._serialized_start=192
-  _globals['_RESPONSE']._serialized_end=293
-  _globals['_STATE']._serialized_start=295
-  _globals['_STATE']._serialized_end=406
-  _globals['_TETRIS']._serialized_start=408
-  _globals['_TETRIS']._serialized_end=469
+  _globals['_RESPONSE']._serialized_start=193
+  _globals['_RESPONSE']._serialized_end=338
+  _globals['_AFTERSTATE']._serialized_start=340
+  _globals['_AFTERSTATE']._serialized_end=427
+  _globals['_STATE']._serialized_start=429
+  _globals['_STATE']._serialized_end=540
+  _globals['_TETRIS']._serialized_start=542
+  _globals['_TETRIS']._serialized_end=603
 # @@protoc_insertion_point(module_scope)
