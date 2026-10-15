@@ -16,6 +16,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 import tetris_env  # noqa: F401
+from viewlog import RunLog
 from dqn import Replay, ValueNet, best_action, evaluate, update
 
 TRAIN_SEED_BASE = 1_000_000  # never overlaps the baseline seeds 1..100 or the validation seeds
@@ -47,6 +48,8 @@ def main():
     p.add_argument("--eps-end", type=float, default=0.01)
     p.add_argument("--eps-decay-steps", type=int, default=50_000)
     p.add_argument("--max-pieces", type=int, default=1_000, help="truncate training episodes")
+    p.add_argument("--viewdata", default="../viewdata", help="where the viewer reads this run's metrics and snapshots")
+    p.add_argument("--snapshot-every", type=int, default=5_000)
     p.add_argument("--eval-every", type=int, default=10_000)
     p.add_argument("--eval-max-pieces", type=int, default=500)
     args = p.parse_args()
@@ -58,6 +61,8 @@ def main():
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
     replay = Replay(args.buffer)
     writer = SummaryWriter(f"runs/{args.name}")
+    log = RunLog(Path(args.viewdata) / args.name, args.name)
+    log.snapshot(0, net)  # the untrained network, the start of the progression
     Path("checkpoints").mkdir(exist_ok=True)
 
     env = gym.make("Tetris-v0", addr=args.addr)
@@ -89,6 +94,7 @@ def main():
             loss = update(net, target_net, optimizer, replay.sample(args.batch, rng), args.gamma, args.double)
             if step % 100 == 0:
                 writer.add_scalar("train/loss", loss, step)
+                log.loss(step, loss)
         if step % args.target_every == 0:
             target_net.load_state_dict(net.state_dict())
 
@@ -97,20 +103,26 @@ def main():
             writer.add_scalar("episode/lines", info["lines"], step)
             writer.add_scalar("episode/pieces", info["pieces"], step)
             writer.add_scalar("train/epsilon", eps, step)
+            log.episode(step, episode_score, info["lines"], info["pieces"], eps)
             episode += 1
             _, info = env.reset(seed=TRAIN_SEED_BASE + episode)
             prev_potential, episode_score = 0.0, 0.0
+
+        if step % args.snapshot_every == 0:
+            log.snapshot(step, net)
 
         if step % args.eval_every == 0:
             result = evaluate(net, eval_env, VALIDATION_SEEDS, args.eval_max_pieces)
             for k, v in result.items():
                 writer.add_scalar(f"validation/{k}", v, step)
+            log.validation(step, result["score"], result["lines"], result["pieces"])
             print(f"step {step} eps {eps:.2f} episodes {episode} validation {result}", flush=True)
             if result["score"] > best_validation:
                 best_validation = result["score"]
                 torch.save(net.state_dict(), f"checkpoints/{args.name}_best.pt")
 
     torch.save(net.state_dict(), f"checkpoints/{args.name}.pt")
+    log.done(args.steps)
     writer.close()
     env.close()
     eval_env.close()

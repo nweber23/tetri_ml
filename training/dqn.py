@@ -50,6 +50,13 @@ class Replay:
                 torch.from_numpy(self.next_mask[idx]))
 
 
+def agent_doc(net: ValueNet, name: str) -> dict:
+    """The network as the Go viewer's agent JSON (weights only; export.py adds curve and test vectors)."""
+    linears = [m for m in net.mlp if isinstance(m, nn.Linear)]
+    return {"name": name, "scale": FEATURE_SCALE.tolist(),
+            "layers": [{"w": m.weight.tolist(), "b": m.bias.tolist()} for m in linears]}
+
+
 def best_action(net: ValueNet, features, mask) -> int:
     with torch.no_grad():
         values = net(torch.from_numpy(features)).masked_fill(~torch.from_numpy(mask), -torch.inf)

@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
-from dqn import FEATURE_SCALE, ValueNet
+from dqn import ValueNet, agent_doc
 
 p = argparse.ArgumentParser()
 p.add_argument("names", nargs="+")
@@ -23,8 +23,7 @@ rng = np.random.default_rng(0)
 for name in args.names:
     net = ValueNet()
     net.load_state_dict(torch.load(f"checkpoints/{name}_best.pt"))
-    linears = [m for m in net.mlp if isinstance(m, torch.nn.Linear)]
-    layers = [{"w": m.weight.tolist(), "b": m.bias.tolist()} for m in linears]
+    doc = agent_doc(net, name)
 
     events = EventAccumulator(f"runs/{name}")
     events.Reload()
@@ -35,6 +34,6 @@ for name in args.names:
         values = net(torch.from_numpy(cases)).tolist()
     check = [{"features": c.tolist(), "value": v} for c, v in zip(cases, values)]
 
-    doc = {"name": name, "scale": FEATURE_SCALE.tolist(), "layers": layers, "curve": curve, "check": check}
+    doc.update(curve=curve, check=check)
     (out / f"{name}.json").write_text(json.dumps(doc))
     print(f"wrote {out / name}.json ({len(curve)} curve points)")
