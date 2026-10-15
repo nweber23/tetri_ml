@@ -32,6 +32,16 @@ message Response {
   int32 reward = 2;
   // Valid placements for state.piece; empty once done.
   repeated Placement placements = 3;
+  // Features of the board after each placement, same order as placements.
+  repeated Afterstate afterstates = 4;
+}
+
+// Afterstate describes the board after a placement and its line clears.
+message Afterstate {
+  int32 aggregate_height = 1;
+  int32 holes = 2;
+  int32 bumpiness = 3;
+  int32 lines = 4;
 }
 
 message State {

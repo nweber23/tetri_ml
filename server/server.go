@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/nweber23/tetri_ml/engine"
+	"github.com/nweber23/tetri_ml/heuristic"
 	pb "github.com/nweber23/tetri_ml/proto/tetris/v1"
 )
 
@@ -83,6 +84,14 @@ func response(g *engine.Game, reward int) *pb.Response {
 	}
 	for _, pl := range g.Placements() {
 		res.Placements = append(res.Placements, &pb.Placement{Rot: int32(pl.Rot), X: int32(pl.X)})
+		b, lines := g.Afterstate(pl)
+		f := heuristic.Extract(b, lines)
+		res.Afterstates = append(res.Afterstates, &pb.Afterstate{
+			AggregateHeight: int32(f.AggregateHeight),
+			Holes:           int32(f.Holes),
+			Bumpiness:       int32(f.Bumpiness),
+			Lines:           int32(f.Lines),
+		})
 	}
 	return res
 }

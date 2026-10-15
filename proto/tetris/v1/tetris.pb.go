@@ -206,7 +206,9 @@ type Response struct {
 	// Score gained by the request; 0 for Reset.
 	Reward int32 `protobuf:"varint,2,opt,name=reward,proto3" json:"reward,omitempty"`
 	// Valid placements for state.piece; empty once done.
-	Placements    []*Placement `protobuf:"bytes,3,rep,name=placements,proto3" json:"placements,omitempty"`
+	Placements []*Placement `protobuf:"bytes,3,rep,name=placements,proto3" json:"placements,omitempty"`
+	// Features of the board after each placement, same order as placements.
+	Afterstates   []*Afterstate `protobuf:"bytes,4,rep,name=afterstates,proto3" json:"afterstates,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -262,6 +264,82 @@ func (x *Response) GetPlacements() []*Placement {
 	return nil
 }
 
+func (x *Response) GetAfterstates() []*Afterstate {
+	if x != nil {
+		return x.Afterstates
+	}
+	return nil
+}
+
+// Afterstate describes the board after a placement and its line clears.
+type Afterstate struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	AggregateHeight int32                  `protobuf:"varint,1,opt,name=aggregate_height,json=aggregateHeight,proto3" json:"aggregate_height,omitempty"`
+	Holes           int32                  `protobuf:"varint,2,opt,name=holes,proto3" json:"holes,omitempty"`
+	Bumpiness       int32                  `protobuf:"varint,3,opt,name=bumpiness,proto3" json:"bumpiness,omitempty"`
+	Lines           int32                  `protobuf:"varint,4,opt,name=lines,proto3" json:"lines,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *Afterstate) Reset() {
+	*x = Afterstate{}
+	mi := &file_tetris_v1_tetris_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Afterstate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Afterstate) ProtoMessage() {}
+
+func (x *Afterstate) ProtoReflect() protoreflect.Message {
+	mi := &file_tetris_v1_tetris_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Afterstate.ProtoReflect.Descriptor instead.
+func (*Afterstate) Descriptor() ([]byte, []int) {
+	return file_tetris_v1_tetris_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Afterstate) GetAggregateHeight() int32 {
+	if x != nil {
+		return x.AggregateHeight
+	}
+	return 0
+}
+
+func (x *Afterstate) GetHoles() int32 {
+	if x != nil {
+		return x.Holes
+	}
+	return 0
+}
+
+func (x *Afterstate) GetBumpiness() int32 {
+	if x != nil {
+		return x.Bumpiness
+	}
+	return 0
+}
+
+func (x *Afterstate) GetLines() int32 {
+	if x != nil {
+		return x.Lines
+	}
+	return 0
+}
+
 type State struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Height x width cells, row 0 (bottom) first. 0 is empty, otherwise piece kind + 1.
@@ -278,7 +356,7 @@ type State struct {
 
 func (x *State) Reset() {
 	*x = State{}
-	mi := &file_tetris_v1_tetris_proto_msgTypes[4]
+	mi := &file_tetris_v1_tetris_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -290,7 +368,7 @@ func (x *State) String() string {
 func (*State) ProtoMessage() {}
 
 func (x *State) ProtoReflect() protoreflect.Message {
-	mi := &file_tetris_v1_tetris_proto_msgTypes[4]
+	mi := &file_tetris_v1_tetris_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -303,7 +381,7 @@ func (x *State) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use State.ProtoReflect.Descriptor instead.
 func (*State) Descriptor() ([]byte, []int) {
-	return file_tetris_v1_tetris_proto_rawDescGZIP(), []int{4}
+	return file_tetris_v1_tetris_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *State) GetBoard() []byte {
@@ -368,13 +446,20 @@ const file_tetris_v1_tetris_proto_rawDesc = "" +
 	"\x04seed\x18\x01 \x01(\x04R\x04seed\"+\n" +
 	"\tPlacement\x12\x10\n" +
 	"\x03rot\x18\x01 \x01(\x05R\x03rot\x12\f\n" +
-	"\x01x\x18\x02 \x01(\x05R\x01x\"\x80\x01\n" +
+	"\x01x\x18\x02 \x01(\x05R\x01x\"\xb9\x01\n" +
 	"\bResponse\x12&\n" +
 	"\x05state\x18\x01 \x01(\v2\x10.tetris.v1.StateR\x05state\x12\x16\n" +
 	"\x06reward\x18\x02 \x01(\x05R\x06reward\x124\n" +
 	"\n" +
 	"placements\x18\x03 \x03(\v2\x14.tetris.v1.PlacementR\n" +
-	"placements\"\x9f\x01\n" +
+	"placements\x127\n" +
+	"\vafterstates\x18\x04 \x03(\v2\x15.tetris.v1.AfterstateR\vafterstates\"\x81\x01\n" +
+	"\n" +
+	"Afterstate\x12)\n" +
+	"\x10aggregate_height\x18\x01 \x01(\x05R\x0faggregateHeight\x12\x14\n" +
+	"\x05holes\x18\x02 \x01(\x05R\x05holes\x12\x1c\n" +
+	"\tbumpiness\x18\x03 \x01(\x05R\tbumpiness\x12\x14\n" +
+	"\x05lines\x18\x04 \x01(\x05R\x05lines\"\x9f\x01\n" +
 	"\x05State\x12\x14\n" +
 	"\x05board\x18\x01 \x01(\fR\x05board\x12\x14\n" +
 	"\x05piece\x18\x02 \x01(\x05R\x05piece\x12\x12\n" +
@@ -398,26 +483,28 @@ func file_tetris_v1_tetris_proto_rawDescGZIP() []byte {
 	return file_tetris_v1_tetris_proto_rawDescData
 }
 
-var file_tetris_v1_tetris_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_tetris_v1_tetris_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_tetris_v1_tetris_proto_goTypes = []any{
-	(*Request)(nil),   // 0: tetris.v1.Request
-	(*Reset)(nil),     // 1: tetris.v1.Reset
-	(*Placement)(nil), // 2: tetris.v1.Placement
-	(*Response)(nil),  // 3: tetris.v1.Response
-	(*State)(nil),     // 4: tetris.v1.State
+	(*Request)(nil),    // 0: tetris.v1.Request
+	(*Reset)(nil),      // 1: tetris.v1.Reset
+	(*Placement)(nil),  // 2: tetris.v1.Placement
+	(*Response)(nil),   // 3: tetris.v1.Response
+	(*Afterstate)(nil), // 4: tetris.v1.Afterstate
+	(*State)(nil),      // 5: tetris.v1.State
 }
 var file_tetris_v1_tetris_proto_depIdxs = []int32{
 	1, // 0: tetris.v1.Request.start:type_name -> tetris.v1.Reset
 	2, // 1: tetris.v1.Request.place:type_name -> tetris.v1.Placement
-	4, // 2: tetris.v1.Response.state:type_name -> tetris.v1.State
+	5, // 2: tetris.v1.Response.state:type_name -> tetris.v1.State
 	2, // 3: tetris.v1.Response.placements:type_name -> tetris.v1.Placement
-	0, // 4: tetris.v1.Tetris.Play:input_type -> tetris.v1.Request
-	3, // 5: tetris.v1.Tetris.Play:output_type -> tetris.v1.Response
-	5, // [5:6] is the sub-list for method output_type
-	4, // [4:5] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	4, // 4: tetris.v1.Response.afterstates:type_name -> tetris.v1.Afterstate
+	0, // 5: tetris.v1.Tetris.Play:input_type -> tetris.v1.Request
+	3, // 6: tetris.v1.Tetris.Play:output_type -> tetris.v1.Response
+	6, // [6:7] is the sub-list for method output_type
+	5, // [5:6] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_tetris_v1_tetris_proto_init() }
@@ -435,7 +522,7 @@ func file_tetris_v1_tetris_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_tetris_v1_tetris_proto_rawDesc), len(file_tetris_v1_tetris_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

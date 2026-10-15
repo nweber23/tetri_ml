@@ -51,6 +51,9 @@ func TestPlayFullGame(t *testing.T) {
 	if err != nil || res.State.Done || len(res.Placements) == 0 {
 		t.Fatalf("reset: %v %+v", err, res)
 	}
+	if len(res.Afterstates) != len(res.Placements) {
+		t.Fatalf("%d afterstates for %d placements", len(res.Afterstates), len(res.Placements))
+	}
 	if len(res.State.Board) != 24*10 {
 		t.Fatalf("board has %d bytes", len(res.State.Board))
 	}
