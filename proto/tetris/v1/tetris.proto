@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package tetris.v1;
+
+option go_package = "github.com/nweber23/tetri_ml/proto/tetris/v1;tetrisv1";
+
+// Tetris runs one game per Play stream. The client must send Reset first.
+service Tetris {
+  rpc Play(stream Request) returns (stream Response);
+}
+
+message Request {
+  oneof action {
+    Reset start = 1;
+    Placement place = 2;
+  }
+}
+
+message Reset {
+  uint64 seed = 1;
+}
+
+// Placement is a rotation state and the x of the piece's bounding box's left edge.
+message Placement {
+  int32 rot = 1;
+  int32 x = 2;
+}
+
+message Response {
+  State state = 1;
+  // Score gained by the request; 0 for Reset.
+  int32 reward = 2;
+  // Valid placements for state.piece; empty once done.
+  repeated Placement placements = 3;
+}
+
+message State {
+  // Height x width cells, row 0 (bottom) first. 0 is empty, otherwise piece kind + 1.
+  bytes board = 1;
+  int32 piece = 2;
+  int32 next = 3;
+  int32 score = 4;
+  int32 lines = 5;
+  int32 pieces = 6;
+  bool done = 7;
+}
