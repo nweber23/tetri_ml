@@ -5,7 +5,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"image"
 	"image/color"
+	"image/color/palette"
+	"image/draw"
+	"image/gif"
 	"image/png"
 	"log"
 	"os"
@@ -48,12 +52,15 @@ var (
 )
 
 type app struct {
-	s          *viewer.Session
-	replaysDir string
-	message    string
-	frame      int
-	shotPath   string
-	shotFrame  int
+	s                         *viewer.Session
+	replaysDir                string
+	message                   string
+	frame                     int
+	shotPath                  string
+	shotFrame                 int
+	recordPath                string
+	recordEvery, recordFrames int
+	recording                 *gif.GIF
 }
 
 func main() {
@@ -67,6 +74,10 @@ func main() {
 	speed := flag.Float64("speed", 1, "agent and replay speed multiplier")
 	shot := flag.String("screenshot", "", "save a PNG of the window after -screenshot-frame frames and exit")
 	shotFrame := flag.Int("screenshot-frame", 120, "frame to capture")
+	snapshot := flag.Int("snapshot", -1, "in training mode, show the latest snapshot at or before this step")
+	record := flag.String("record", "", "record the window to this animated GIF and exit")
+	recordEvery := flag.Int("record-every", 6, "capture every Nth frame (60 frames per second)")
+	recordFrames := flag.Int("record-frames", 600, "stop recording after this many frames")
 	flag.Parse()
 
 	agents, err := loadAgents(*agentsDir)
@@ -114,11 +125,38 @@ func main() {
 		log.Fatalf("unknown mode %q", *mode)
 	}
 
+	if *snapshot >= 0 {
+		s.SelectSnapshot(*snapshot)
+	}
+
+	a := &app{s: s, replaysDir: *replaysDir, shotPath: *shot, shotFrame: *shotFrame,
+		recordPath: *record, recordEvery: max(*recordEvery, 1), recordFrames: *recordFrames}
+	if *record != "" {
+		a.recording = &gif.GIF{}
+	}
 	ebiten.SetWindowSize(screenW, screenH)
 	ebiten.SetWindowTitle("Tetris ML viewer")
-	if err := ebiten.RunGame(&app{s: s, replaysDir: *replaysDir, shotPath: *shot, shotFrame: *shotFrame}); err != nil && err != ebiten.Termination {
+	if err := ebiten.RunGame(a); err != nil && err != ebiten.Termination {
 		log.Fatal(err)
 	}
+	if a.recording != nil {
+		f, err := os.Create(*record)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+		if err := gif.EncodeAll(f, a.recording); err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+// capture copies the screen into an image the encoders can read quickly.
+func capture(screen *ebiten.Image) *image.RGBA {
+	b := screen.Bounds()
+	img := image.NewRGBA(b)
+	screen.ReadPixels(img.Pix)
+	return img
 }
 
 func loadAgents(dir string) ([]*agent.Agent, error) {
@@ -146,7 +184,7 @@ func held(k ebiten.Key) bool {
 
 func (a *app) Update() error {
 	a.frame++
-	if a.shotPath != "" && a.frame > a.shotFrame {
+	if (a.shotPath != "" && a.frame > a.shotFrame) || (a.recording != nil && a.frame > a.recordFrames) {
 		return ebiten.Termination
 	}
 	s := a.s
@@ -232,9 +270,15 @@ func (a *app) Draw(screen *ebiten.Image) {
 			log.Fatal(err)
 		}
 		defer f.Close()
-		if err := png.Encode(f, screen); err != nil {
+		if err := png.Encode(f, capture(screen)); err != nil {
 			log.Fatal(err)
 		}
+	}
+	if a.recording != nil && a.frame%a.recordEvery == 0 {
+		img := image.NewPaletted(screen.Bounds(), palette.WebSafe)
+		draw.Draw(img, img.Bounds(), capture(screen), image.Point{}, draw.Src)
+		a.recording.Image = append(a.recording.Image, img)
+		a.recording.Delay = append(a.recording.Delay, a.recordEvery*100/60)
 	}
 }
 

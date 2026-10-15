@@ -110,6 +110,20 @@ func (s *Session) SelectRun(delta int) {
 	}
 }
 
+// SelectSnapshot shows the latest snapshot at or before step and restarts the same seed.
+func (s *Session) SelectSnapshot(step int) {
+	if s.Mode != Training || s.Run() == nil {
+		return
+	}
+	for i, snap := range s.Run().Snapshots {
+		if snap.Step <= step {
+			s.AgentIdx = i
+		}
+	}
+	s.Follow = false
+	s.Restart(s.Seed)
+}
+
 // useRun swaps the agent list for the selected run's snapshots, following it if training is still going.
 func (s *Session) useRun() {
 	r := s.Run()
@@ -136,10 +150,11 @@ func (s *Session) RefreshRuns() error {
 		if i == s.RunIdx && s.Mode == Training && len(r.Snapshots) > before {
 			follow, shown := s.Follow, s.AgentIdx
 			s.useRun()
-			if s.Follow = follow; !follow {
-				s.AgentIdx = shown
+			if s.Follow = follow; follow {
+				s.Restart(s.Seed) // a new agent to show
+			} else {
+				s.AgentIdx = shown // keep playing the same game
 			}
-			s.Restart(s.Seed)
 		}
 	}
 	return firstErr

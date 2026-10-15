@@ -82,12 +82,17 @@ func TestFollowLiveRun(t *testing.T) {
 	}
 
 	s.SelectAgent(-1) // the user steps back by hand: stop following
+	s.Update(stepInterval, Input{})
+	pieces := s.Game.State().Pieces
 	addSnapshots(t, filepath.Join(root, "live"), "000010000")
 	if err := s.RefreshRuns(); err != nil {
 		t.Fatal(err)
 	}
 	if s.Follow || s.SnapshotStep() != 0 || len(s.Agents) != 3 {
 		t.Errorf("follow=%v step=%d agents=%d, want the viewer to stay on step 0 with the new snapshot available", s.Follow, s.SnapshotStep(), len(s.Agents))
+	}
+	if s.Game.State().Pieces != pieces {
+		t.Error("a new snapshot restarted a game that was not following")
 	}
 }
 
@@ -112,5 +117,18 @@ func TestTrainingNeedsRuns(t *testing.T) {
 	s.SetMode(Training)
 	if s.Mode != Human {
 		t.Errorf("mode %v, want human without runs", s.Mode)
+	}
+}
+
+func TestSelectSnapshot(t *testing.T) {
+	root := t.TempDir()
+	makeRun(t, root, "a", true, "000000000", "000005000", "000010000")
+	s := trainingSession(t, root)
+	s.SetMode(Training)
+	for _, c := range []struct{ ask, want int }{{0, 0}, {7000, 5000}, {10000, 10000}, {999999, 10000}} {
+		s.SelectSnapshot(c.ask)
+		if got := s.SnapshotStep(); got != c.want {
+			t.Errorf("SelectSnapshot(%d) = %d, want %d", c.ask, got, c.want)
+		}
 	}
 }
