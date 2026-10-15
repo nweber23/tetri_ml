@@ -145,8 +145,12 @@ func (g *Game) lock() int {
 func (g *Game) spawn() {
 	k := g.next
 	g.next = g.bag.pop()
-	g.cur = Piece{Kind: k, X: 3, Y: Height - boxSize(k)}
+	g.cur = spawnPiece(k)
 	if !g.board.fits(g.cur) {
 		g.done = true
 	}
+}
+
+func spawnPiece(k Kind) Piece {
+	return Piece{Kind: k, X: 3, Y: Height - boxSize(k)}
 }
