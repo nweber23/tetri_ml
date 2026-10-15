@@ -21,6 +21,7 @@ import (
 	"github.com/nweber23/tetri_ml/agent"
 	"github.com/nweber23/tetri_ml/engine"
 	"github.com/nweber23/tetri_ml/replay"
+	"github.com/nweber23/tetri_ml/trainlog"
 	"github.com/nweber23/tetri_ml/viewer"
 )
 
@@ -57,10 +58,12 @@ type app struct {
 
 func main() {
 	agentsDir := flag.String("agents", "agents", "directory of exported agents (*.json)")
+	runsDir := flag.String("runs", "viewdata", "directory of training runs written by train.py (live or finished)")
+	runName := flag.String("run", "", "training run to show first (default: the first one)")
 	replayFile := flag.String("replay", "", "replay file to load")
 	replaysDir := flag.String("replays", "replays", "where S saves replays")
 	seed := flag.Uint64("seed", 1, "game seed")
-	mode := flag.String("mode", "", "start mode: human, agent or replay")
+	mode := flag.String("mode", "", "start mode: human, agent, replay or training")
 	speed := flag.Float64("speed", 1, "agent and replay speed multiplier")
 	shot := flag.String("screenshot", "", "save a PNG of the window after -screenshot-frame frames and exit")
 	shotFrame := flag.Int("screenshot-frame", 120, "frame to capture")
@@ -80,6 +83,19 @@ func main() {
 	}
 
 	s := viewer.New(*seed, agents, r)
+	if _, err := os.Stat(*runsDir); err == nil {
+		runs, err := trainlog.LoadAll(*runsDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+		s.SetRuns(runs)
+		for i := 0; *runName != "" && s.Run().Name != *runName; i++ {
+			if i == len(runs) {
+				log.Fatalf("no run %q in %s", *runName, *runsDir)
+			}
+			s.SelectRun(1)
+		}
+	}
 	s.Speed = *speed
 	switch *mode {
 	case "human":
@@ -88,6 +104,8 @@ func main() {
 		s.SetMode(viewer.AgentPlay)
 	case "replay":
 		s.SetMode(viewer.Replaying)
+	case "training":
+		s.SetMode(viewer.Training)
 	case "":
 		if r != nil {
 			s.SetMode(viewer.Replaying)
@@ -134,8 +152,8 @@ func (a *app) Update() error {
 	s := a.s
 	switch {
 	case inpututil.IsKeyJustPressed(ebiten.KeyTab):
-		for i := 1; i <= 3; i++ { // next mode that has what it needs (agents or a replay)
-			if m := (s.Mode + viewer.Mode(i)) % 3; a.modeAvailable(m) {
+		for i := 1; i < viewer.NumModes; i++ { // next mode that has what it needs (agents, a replay or runs)
+			if m := (s.Mode + viewer.Mode(i)) % viewer.NumModes; a.modeAvailable(m) {
 				s.SetMode(m)
 				break
 			}
@@ -146,6 +164,10 @@ func (a *app) Update() error {
 		s.SelectAgent(-1)
 	case inpututil.IsKeyJustPressed(ebiten.KeyBracketRight):
 		s.SelectAgent(1)
+	case inpututil.IsKeyJustPressed(ebiten.KeyR):
+		s.SelectRun(1)
+	case inpututil.IsKeyJustPressed(ebiten.KeyF):
+		s.Follow = !s.Follow
 	case inpututil.IsKeyJustPressed(ebiten.KeyP):
 		s.Paused = !s.Paused
 	case inpututil.IsKeyJustPressed(ebiten.KeyEqual), inpututil.IsKeyJustPressed(ebiten.KeyKPAdd):
@@ -157,6 +179,12 @@ func (a *app) Update() error {
 			a.message = err.Error()
 		} else {
 			a.message = "saved " + path
+		}
+	}
+
+	if a.frame%60 == 0 { // pick up what a running training process has written
+		if err := s.RefreshRuns(); err != nil {
+			a.message = err.Error()
 		}
 	}
 
@@ -180,6 +208,8 @@ func (a *app) modeAvailable(m viewer.Mode) bool {
 		return a.s.Agent() != nil
 	case viewer.Replaying:
 		return a.s.Replay != nil
+	case viewer.Training:
+		return a.s.Run() != nil
 	}
 	return true
 }
@@ -190,8 +220,12 @@ func (a *app) Draw(screen *ebiten.Image) {
 	screen.Fill(background)
 	a.drawBoard(screen)
 	a.drawInfo(screen)
-	a.drawHeatmap(screen)
-	a.drawCurve(screen)
+	if a.s.Mode == viewer.Training {
+		a.drawTraining(screen)
+	} else {
+		a.drawHeatmap(screen)
+		a.drawCurve(screen)
+	}
 	if a.shotPath != "" && a.frame == a.shotFrame {
 		f, err := os.Create(a.shotPath)
 		if err != nil {
@@ -257,7 +291,7 @@ func (a *app) drawInfo(screen *ebiten.Image) {
 	s := a.s
 	st := s.Game.State()
 	name := "-"
-	if ag := s.Agent(); ag != nil && s.Mode == viewer.AgentPlay {
+	if ag := s.Agent(); ag != nil && (s.Mode == viewer.AgentPlay || s.Mode == viewer.Training) {
 		name = fmt.Sprintf("%s (%d/%d)", ag.Name, s.AgentIdx+1, len(s.Agents))
 	}
 	status := ""
@@ -272,7 +306,7 @@ func (a *app) drawInfo(screen *ebiten.Image) {
 	text := fmt.Sprintf("mode: %s%s\nagent: %s\nseed: %d   speed: x%g\nscore %d   lines %d   pieces %d",
 		s.Mode, status, name, seedOf(s), s.Speed, st.Score, st.Lines, st.Pieces)
 	ebitenutil.DebugPrintAt(screen, text, 300, 10)
-	help := "Tab mode  N new seed  [ ] agent  P pause  +/- speed  S save replay\nHuman: arrows move, up/X rotate, Z rotate back, space drop"
+	help := "Tab mode  N new seed  [ ] agent/snapshot  R next run  F follow live  P pause  +/- speed  S save replay\nHuman: arrows move, up/X rotate, Z rotate back, space drop"
 	ebitenutil.DebugPrintAt(screen, help, 20, screenH-30)
 	if a.message != "" {
 		ebitenutil.DebugPrintAt(screen, a.message, 300, screenH-50)

@@ -11,6 +11,7 @@ import (
 	"github.com/nweber23/tetri_ml/agent"
 	"github.com/nweber23/tetri_ml/engine"
 	"github.com/nweber23/tetri_ml/replay"
+	"github.com/nweber23/tetri_ml/trainlog"
 )
 
 type Mode int
@@ -19,10 +20,14 @@ const (
 	Human Mode = iota
 	AgentPlay
 	Replaying
+	Training // agent playback over the snapshots of a training run
 )
 
+// NumModes is the number of modes, for cycling through them.
+const NumModes = 4
+
 func (m Mode) String() string {
-	return [...]string{"human", "agent", "replay"}[m]
+	return [...]string{"human", "agent", "replay", "training"}[m]
 }
 
 const (
@@ -47,6 +52,12 @@ type Session struct {
 	Scores   []agent.Scored // the agent's value for each candidate placement of the current piece
 	BestIdx  int            // index into Scores of the placement the agent will play, or -1
 
+	Runs   []*trainlog.Run // training runs the viewer can follow
+	RunIdx int
+	Follow bool // in training mode, jump to each new snapshot as training writes it
+
+	base []*agent.Agent // the agents loaded at startup; Agents is swapped for a run's snapshots in training mode
+
 	Replay    *replay.Replay // loaded replay, if any
 	ReplayPos int
 	Played    []engine.Placement // placements of the current agent game, for saving
@@ -57,12 +68,81 @@ type Session struct {
 // New starts a session in agent mode if there are agents, otherwise human mode.
 // A non-nil r makes replay mode available.
 func New(seed uint64, agents []*agent.Agent, r *replay.Replay) *Session {
-	s := &Session{Game: engine.New(seed), Seed: seed, Agents: agents, Replay: r, Speed: 1}
+	s := &Session{Game: engine.New(seed), Seed: seed, Agents: agents, base: agents, Replay: r, Speed: 1}
 	if len(agents) > 0 {
 		s.Mode = AgentPlay
 	}
 	s.prepare()
 	return s
+}
+
+// SetRuns makes training mode available.
+func (s *Session) SetRuns(runs []*trainlog.Run) {
+	s.Runs = runs
+}
+
+// Run returns the selected training run, or nil if there are none.
+func (s *Session) Run() *trainlog.Run {
+	if len(s.Runs) == 0 {
+		return nil
+	}
+	return s.Runs[s.RunIdx]
+}
+
+// SnapshotStep is the training step of the agent being shown in training mode, or -1.
+func (s *Session) SnapshotStep() int {
+	if s.Mode != Training || s.Run() == nil || s.AgentIdx >= len(s.Run().Snapshots) {
+		return -1
+	}
+	return s.Run().Snapshots[s.AgentIdx].Step
+}
+
+// SelectRun moves to another training run and shows its latest snapshot.
+func (s *Session) SelectRun(delta int) {
+	if len(s.Runs) == 0 {
+		return
+	}
+	n := len(s.Runs)
+	s.RunIdx = ((s.RunIdx+delta)%n + n) % n
+	if s.Mode == Training {
+		s.useRun()
+		s.Restart(s.Seed)
+	}
+}
+
+// useRun swaps the agent list for the selected run's snapshots, following it if training is still going.
+func (s *Session) useRun() {
+	r := s.Run()
+	s.Agents = s.Agents[:0:0]
+	for _, snap := range r.Snapshots {
+		s.Agents = append(s.Agents, snap.Agent)
+	}
+	s.AgentIdx = max(len(s.Agents)-1, 0)
+	s.Follow = !r.Done
+}
+
+// RefreshRuns picks up new metrics and snapshots from training processes that are still running.
+// In training mode with Follow on, a new snapshot restarts the game with that agent.
+func (s *Session) RefreshRuns() error {
+	var firstErr error
+	for i, r := range s.Runs {
+		if r.Done {
+			continue
+		}
+		before := len(r.Snapshots)
+		if _, err := r.Refresh(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+		if i == s.RunIdx && s.Mode == Training && len(r.Snapshots) > before {
+			follow, shown := s.Follow, s.AgentIdx
+			s.useRun()
+			if s.Follow = follow; !follow {
+				s.AgentIdx = shown
+			}
+			s.Restart(s.Seed)
+		}
+	}
+	return firstErr
 }
 
 // Agent returns the selected agent, or nil if none is loaded.
@@ -75,8 +155,14 @@ func (s *Session) Agent() *agent.Agent {
 
 // SetMode switches mode and restarts. Agent mode needs an agent and replay mode a loaded replay.
 func (s *Session) SetMode(m Mode) {
-	if (m == AgentPlay && s.Agent() == nil) || (m == Replaying && s.Replay == nil) {
+	if (m == AgentPlay && len(s.base) == 0) || (m == Replaying && s.Replay == nil) || (m == Training && s.Run() == nil) {
 		return
+	}
+	if s.Mode == Training && m != Training {
+		s.Agents, s.AgentIdx = s.base, 0
+	}
+	if m == Training && s.Mode != Training {
+		s.useRun()
 	}
 	s.Mode = m
 	if m == Replaying {
@@ -93,6 +179,7 @@ func (s *Session) SelectAgent(delta int) {
 	}
 	n := len(s.Agents)
 	s.AgentIdx = ((s.AgentIdx+delta)%n + n) % n
+	s.Follow = false // stepping by hand stops following a live run
 	s.Restart(s.Seed)
 }
 
@@ -109,7 +196,7 @@ func (s *Session) Restart(seed uint64) {
 // prepare scores the current piece's placements so the viewer can show them before the agent plays.
 func (s *Session) prepare() {
 	s.Scores, s.BestIdx = nil, -1
-	if s.Mode == AgentPlay && !s.Game.State().Done {
+	if (s.Mode == AgentPlay || s.Mode == Training) && s.Agent() != nil && !s.Game.State().Done {
 		s.Scores = s.Agent().Evaluate(s.Game)
 		s.BestIdx = agent.Best(s.Scores)
 	}
@@ -122,7 +209,7 @@ func (s *Session) Update(dt time.Duration, in Input) {
 	switch s.Mode {
 	case Human:
 		s.updateHuman(dt, in)
-	case AgentPlay:
+	case AgentPlay, Training:
 		s.stepAcc += time.Duration(float64(dt) * s.Speed)
 		for s.stepAcc >= stepInterval && s.BestIdx >= 0 {
 			s.stepAcc -= stepInterval
