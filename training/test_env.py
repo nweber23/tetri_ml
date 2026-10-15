@@ -40,6 +40,10 @@ class TestTetrisEnv(unittest.TestCase):
         self.assertTrue(self.env.observation_space.contains(obs))
         self.assertEqual(obs["board"].sum(), 0)
         self.assertTrue(info["action_mask"].any())
+        features = info["afterstates"]
+        self.assertEqual(features.shape, (48, 4))
+        self.assertFalse(features[~info["action_mask"]].any())
+        self.assertTrue(features[info["action_mask"]][:, 0].all())  # every placement adds height
 
     def test_same_seed_same_pieces(self):
         a, _ = self.env.reset(seed=7)

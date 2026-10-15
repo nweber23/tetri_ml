@@ -14,6 +14,7 @@ NUM_KINDS = 7
 NUM_ROT = 4
 X_MIN, NUM_X = -2, 12  # placement x ranges over [-2, 9]
 NUM_ACTIONS = NUM_ROT * NUM_X
+NUM_FEATURES = 4  # aggregate height, holes, bumpiness, lines cleared
 
 
 def action_index(rot: int, x: int) -> int:
@@ -25,7 +26,8 @@ class TetrisEnv(gym.Env):
 
     An action is `rot * 12 + (x + 2)`: a rotation state and the column of the
     piece's bounding box's left edge. `info["action_mask"]` marks the valid
-    actions; sending an invalid one raises ValueError. The reward is the
+    actions and `info["afterstates"]` (NUM_ACTIONS x NUM_FEATURES) holds the
+    board features after each one, zeros for invalid actions; sending an invalid one raises ValueError. The reward is the
     line-clear score (100/300/500/800).
     """
 
@@ -47,15 +49,18 @@ class TetrisEnv(gym.Env):
         self._requests.put(request)
         res = next(self._responses)
         self._mask = np.zeros(NUM_ACTIONS, bool)
-        for pl in res.placements:
-            self._mask[action_index(pl.rot, pl.x)] = True
+        features = np.zeros((NUM_ACTIONS, NUM_FEATURES), np.float32)
+        for pl, a in zip(res.placements, res.afterstates):
+            i = action_index(pl.rot, pl.x)
+            self._mask[i] = True
+            features[i] = (a.aggregate_height, a.holes, a.bumpiness, a.lines)
         s = res.state
         obs = {
             "board": np.frombuffer(s.board, np.uint8).reshape(HEIGHT, WIDTH),
             "piece": s.piece,
             "next": s.next,
         }
-        info = {"action_mask": self._mask, "score": s.score, "lines": s.lines, "pieces": s.pieces}
+        info = {"action_mask": self._mask, "afterstates": features, "score": s.score, "lines": s.lines, "pieces": s.pieces}
         return obs, res.reward, s.done, info
 
     def reset(self, *, seed=None, options=None):

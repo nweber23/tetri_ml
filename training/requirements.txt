@@ -3,3 +3,6 @@ grpcio-tools==1.84.0
 protobuf==7.36.2
 gymnasium==1.4.0
 numpy==2.4.6
+# CPU build: pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple
+torch==2.14.1
+tensorboard==2.21.0
