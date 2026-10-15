@@ -20,6 +20,27 @@ go run ./cmd/viewer -screenshot out.png -screenshot-frame 240   # save a frame a
 
 The heatmap shows the agent's value for every candidate placement of the current piece (row = rotation, column = x, green is high, the white outline is the placement it plays, also outlined on the board). The learning-curve panel shows the validation score recorded during that agent's training.
 
+## Training mode
+
+Tab to `training` shows how a run learned: the agent plays the same seed at each snapshot of the run, with charts on the right for the episode score (moving average), validation score of all runs with the shown snapshot marked, loss and epsilon.
+
+| Key | Action |
+|---|---|
+| `[` `]` | step back and forward through the run's snapshots (early, mid, late training) |
+| R | next run |
+| F | follow live: jump to each new snapshot as training writes it |
+
+`train.py` writes `viewdata/<run>/metrics.jsonl` and a snapshot every 5000 steps (`--snapshot-every`), including the untrained network at step 0. The viewer re-reads those files once a second, so the same view works for a run in progress ("LIVE") and a finished one. Earlier TensorBoard-only runs can be converted with `export_runs.py`, which gives them one snapshot (the final network).
+
+```
+cd training
+python train.py --name show --double          # writes ../viewdata/show while it trains
+python export_runs.py raw ddqn_s0 ddqn_s1     # older runs, from runs/ and checkpoints/
+cd .. && go run ./cmd/viewer -mode training -run show
+```
+
+`viewdata/` is not committed. The `-runs` flag points the viewer at another directory.
+
 ## Agents
 
 The viewer runs the network itself from JSON, no Python needed. Export trained checkpoints with:
