@@ -7,7 +7,10 @@ go run ./cmd/viewer                          # plays the exported agents, agent 
 go run ./cmd/viewer -mode human              # play yourself
 go run ./cmd/viewer -replay replays/x.json   # replay a saved game
 go run ./cmd/viewer -screenshot out.png -screenshot-frame 240   # save a frame and exit
+go run ./cmd/viewer -mode training -run show -snapshot 20000 -speed 2 -record out.gif -record-frames 600   # record a GIF and exit
 ```
+
+`-snapshot N` picks the latest snapshot at or before step N, and `-record` captures every 6th frame (`-record-every`) with a fixed 216-colour palette, so GIFs are a bit coarser than the window.
 
 | Key | Action |
 |---|---|
