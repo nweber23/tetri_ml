@@ -1,0 +1,5 @@
+grpcio==1.84.0
+grpcio-tools==1.84.0
+protobuf==7.36.2
+gymnasium==1.4.0
+numpy==2.4.6
