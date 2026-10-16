@@ -75,3 +75,12 @@ func TestMoveFeatures(t *testing.T) {
 		}
 	}
 }
+
+func TestBestMoveDiscountsTheAfterstateValue(t *testing.T) {
+	// Move 0 is worth 1.0. Move 1 has no reward and a value of 1.005, which wins without discounting (1.005)
+	// and loses with gamma 0.99 (0.99495), as in training.
+	scored := []ScoredMove{{Move: engine.Move{Reward: 100}, Value: 0}, {Value: 1.005}}
+	if got := BestMove(scored); got != 0 {
+		t.Errorf("BestMove = %d, want 0", got)
+	}
+}

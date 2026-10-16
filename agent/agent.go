@@ -141,12 +141,15 @@ func (a *Agent) EvaluateMoves(g *engine.Game) []ScoredMove {
 	return out
 }
 
-// BestMove returns the index of the move with the highest reward plus afterstate value, or -1 if there is none.
+// moveGamma discounts the afterstate value against the move's own reward; it must equal GAMMA in training/dqn_moves.py.
+const moveGamma = 0.99
+
+// BestMove returns the index of the move with the highest reward/100 + gamma * afterstate value, or -1 if there is none.
 func BestMove(scored []ScoredMove) int {
-	best := -1
+	best, bestValue := -1, 0.0
 	for i, s := range scored {
-		if best < 0 || float64(s.Move.Reward)/100+s.Value > float64(scored[best].Move.Reward)/100+scored[best].Value {
-			best = i
+		if v := float64(s.Move.Reward)/100 + moveGamma*s.Value; best < 0 || v > bestValue {
+			best, bestValue = i, v
 		}
 	}
 	return best
