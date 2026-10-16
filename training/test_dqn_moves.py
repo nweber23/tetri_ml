@@ -14,6 +14,16 @@ class TestMoveDQN(unittest.TestCase):
         f[..., :4] = 200  # the four scalar features are bytes, not bits
         np.testing.assert_array_equal(unpack(pack(f)), f)
 
+    def test_warm_start_computes_the_heuristic(self):
+        net = MoveNet()
+        x = torch.zeros(2, MOVE_FEATURES)
+        x[:, :4] = torch.tensor([[40.0, 3.0, 12.0, 0.0], [30.0, 0.0, 6.0, 2.0]])
+        x[:, 4:] = torch.rand(2, MOVE_FEATURES - 4).round()  # the board and one-hots must not matter yet
+        h = [-0.510066, -0.35663, -0.184483, 0.760666]
+        want = [0.1 * sum(w * v for w, v in zip(h, row[:4].tolist())) for row in x]
+        for got, w in zip(net(x).tolist(), want):
+            self.assertAlmostEqual(got, w, places=4)
+
     def test_best_move_counts_reward_and_ignores_padding(self):
         torch.manual_seed(0)
         net = MoveNet()
@@ -37,6 +47,19 @@ class TestMoveDQN(unittest.TestCase):
         for _ in range(200):
             loss = update(net, copy.deepcopy(net), optimizer, batch)
         self.assertLess(loss, 1e-3)
+
+    def test_game_over_is_worth_the_penalty(self):
+        torch.manual_seed(0)
+        net = MoveNet()
+        optimizer = torch.optim.Adam(net.parameters(), lr=1e-2)
+        replay = Replay(8)
+        for _ in range(8):
+            replay.add(np.zeros(MOVE_FEATURES, np.uint8), True, np.zeros((MAX_MOVES, MOVE_FEATURES), np.uint8),
+                       np.zeros(MAX_MOVES, np.float32), np.zeros(MAX_MOVES, bool))
+        batch = replay.sample(8, np.random.default_rng(0))
+        for _ in range(300):
+            update(net, copy.deepcopy(net), optimizer, batch, death_penalty=5.0)
+        self.assertAlmostEqual(net(batch[0])[0].item(), -5.0, places=1)
 
     def test_update_bootstraps_from_best_next_move(self):
         torch.manual_seed(0)

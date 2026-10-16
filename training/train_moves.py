@@ -28,6 +28,9 @@ def main():
     p.add_argument("--addr", default="127.0.0.1:50051")
     p.add_argument("--steps", type=int, default=100_000)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--death-penalty", type=float, default=5.0, help="value of a finished game, in units of 100 points")
+    p.add_argument("--cold", action="store_true", help="random initial weights instead of the heuristic warm start")
+    p.add_argument("--no-board", action="store_true", help="hide the 200 board cells from the network")
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--batch", type=int, default=128)
     p.add_argument("--buffer", type=int, default=50_000)
@@ -45,7 +48,7 @@ def main():
 
     rng = np.random.default_rng(args.seed)
     torch.manual_seed(args.seed)
-    net = MoveNet()
+    net = MoveNet(warm_start=not args.cold, use_board=not args.no_board)
     target_net = copy.deepcopy(net)
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
     replay = Replay(args.buffer)
@@ -74,7 +77,7 @@ def main():
         episode_score += score_gain
 
         if replay.size >= args.warmup and step % args.update_every == 0:
-            loss = update(net, target_net, optimizer, replay.sample(args.batch, rng))
+            loss = update(net, target_net, optimizer, replay.sample(args.batch, rng), args.death_penalty)
             if step % 100 == 0:
                 writer.add_scalar("train/loss", loss, step)
                 log.loss(step, loss)

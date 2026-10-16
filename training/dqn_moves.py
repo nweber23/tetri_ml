@@ -16,25 +16,53 @@ GAMMA = 0.99  # the Go viewer uses the same value to rank moves
 # Aggregate height, holes, bumpiness and lines are scaled; the 200 board cells and the one-hots are already 0/1.
 SCALE = torch.tensor([100.0, 20.0, 50.0, 4.0] + [1.0] * (MOVE_FEATURES - 4))
 BOARD = slice(4, 204)
+HEURISTIC = [-0.510066, -0.35663, -0.184483, 0.760666]  # heuristic.Default: aggregate height, holes, bumpiness, lines
 
 
 class MoveNet(nn.Module):
-    def __init__(self, hidden: int = 128):
+    def __init__(self, hidden: int = 128, warm_start: bool = True, use_board: bool = True):
         super().__init__()
+        self.use_board = use_board
+        self.register_buffer("visible", torch.ones(MOVE_FEATURES).index_fill_(0, torch.arange(4, 204), float(use_board)), persistent=False)
         self.mlp = nn.Sequential(
             nn.Linear(MOVE_FEATURES, hidden), nn.ReLU(),
             nn.Linear(hidden, hidden // 2), nn.ReLU(),
             nn.Linear(hidden // 2, 1),
         )
 
+        if warm_start:
+            self._warm_start()
+
+    def _warm_start(self, shrink: float = 0.1):
+        """Make the network compute the hand-weighted heuristic at first, then learn from there.
+
+        The first four units of each hidden layer pass the four scaled heuristic features through
+        (they are never negative, so ReLU leaves them alone) and the output weighs them like the
+        heuristic does. Every other output weight starts at zero. Learning to clear lines from a
+        randomly initialised network on 200 board cells did not get off the ground (docs/MOVES.md).
+        """
+        first, second, out = (m for m in self.mlp if isinstance(m, nn.Linear))
+        with torch.no_grad():
+            for i in range(4):
+                first.weight[i].zero_()
+                first.weight[i, i] = 1.0
+                first.bias[i] = 0.0
+                second.weight[i].zero_()
+                second.weight[i, i] = 1.0
+                second.bias[i] = 0.0
+            out.weight.zero_()
+            out.bias.zero_()
+            out.weight[0, :4] = torch.tensor(HEURISTIC) * SCALE[:4] * shrink
+
     def forward(self, features):
-        return self.mlp(features / SCALE).squeeze(-1)
+        return self.mlp(features / SCALE * self.visible).squeeze(-1)
 
 
 def agent_doc(net: MoveNet, name: str) -> dict:
     linears = [m for m in net.mlp if isinstance(m, nn.Linear)]
+    w0 = linears[0].weight * net.visible  # inputs the network never sees get zero weights, so the exported MLP is plain
     return {"name": name, "scale": SCALE.tolist(),
-            "layers": [{"w": m.weight.tolist(), "b": m.bias.tolist()} for m in linears]}
+            "layers": [{"w": w0.tolist(), "b": linears[0].bias.tolist()}] + [{"w": m.weight.tolist(), "b": m.bias.tolist()} for m in linears[1:]]}
 
 
 def pack(features: np.ndarray) -> np.ndarray:
@@ -86,11 +114,11 @@ def best_move(net: MoveNet, features, rewards, mask) -> int:
                                torch.from_numpy(rewards), torch.from_numpy(mask)).argmax())
 
 
-def update(net, target_net, optimizer, batch) -> float:
+def update(net, target_net, optimizer, batch, death_penalty: float = 0.0) -> float:
     features, done, next_features, next_rewards, next_mask = batch
     with torch.no_grad():
         best = move_values(target_net, next_features, next_rewards, next_mask).max(dim=1).values
-        target = torch.where(done, torch.zeros_like(best), best)
+        target = torch.where(done, torch.full_like(best, -death_penalty), best)  # in units of 100 points
     loss = nn.functional.smooth_l1_loss(net(features), target)
     optimizer.zero_grad()
     loss.backward()
