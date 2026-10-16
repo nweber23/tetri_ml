@@ -13,16 +13,17 @@ A Tetris engine written in Go, a reinforcement learning agent trained with PyTor
 
 ### An agent that uses the whole game
 
-Hold, tucks, spins and T-spins are in the engine too. A move agent picks among every reachable way to lock a piece, and it learns only when its network cannot see the board (seeds 1-100, 3000-piece cap, move-agent scores include T-spin points):
+Hold, tucks, spins and T-spins are in the engine too. A move agent picks among every reachable way to lock a piece. It learns reliably when its network cannot see the board, and it can see the board only if the board inputs are scaled down 100 times (seeds 1-100, 3000-piece cap, move-agent scores include T-spin points):
 
 | Agent | Avg score | Reached the cap | Score / piece | T-spins / game |
 |---|---|---|---|---|
 | Scripted, all moves, same heuristic weights | 164,331 | 100/100 | 54.8 | 70 |
-| Learned move agent, 2 training seeds | 241,493 and 236,973 | 66/100 and 54/100 | 97.4 and 102.7 | 233 and 254 |
+| Learned move agent, 3 training seeds, final networks | 241,493 / 236,973 / 104,800 | 66 / 54 / 8 of 100 | 97.4 / 102.7 / 100.2 | 233 / 254 / 106 |
+| Same, best-validation checkpoints | 206,816 / 236,973 / 285,432 | 42 / 54 / 94 of 100 | 100.5 / 102.7 / 98.3 | 223 / 254 / 313 |
 
 ![Move agent after 100,000 steps](docs/media/moves_late.gif)
 
-It scores more but survives less often, and the T-spin points are partly a product of the reward. What failed first, and why, is in [docs/MOVES.md](docs/MOVES.md).
+It scores more but survives less often, the T-spin points are partly a product of the reward, and one training run's checkpoints differ by more than the gap to the scripted agent (seed 2: 285k at 80k steps, 105k at 100k). What failed first, and why, is in [docs/MOVES.md](docs/MOVES.md).
 
 The write-up, including what did not work, is in [docs/BLOG.md](docs/BLOG.md). A follow-up measurement (clear sizes, score per piece, 10,000-piece cap) is in [docs/ANALYSIS.md](docs/ANALYSIS.md).
 
@@ -50,7 +51,7 @@ Training never depends on rendering.
 
 ## Setup
 
-Needs Go 1.25+ and Python 3.11. Tested on Windows 11 and Linux.
+Needs Go 1.26+ (`go.mod` pins the 1.27.2 toolchain, which the `go` command downloads by itself) and Python 3.11. Tested on Windows 11 and Linux.
 
 ```bash
 go test ./...
@@ -83,7 +84,7 @@ go run ./cmd/server                                 # terminal 1, listens on 127
 cd training                                         # terminal 2
 python train.py --name mine --double                # writes ../viewdata/mine while it trains
 python evaluate.py checkpoints/mine_best.pt --max-pieces 3000
-python train_moves.py --name moves --no-board       # the full-game agent (about an hour)
+python train_moves.py --name moves --no-board       # the full-game agent (about an hour); --board-scale 0.01 keeps the board visible
 python export_moves.py moves --no-board --final     # then: go run ./cmd/baseline -agent agents/moves_final.json
 tensorboard --logdir runs
 ```
@@ -96,7 +97,7 @@ go run ./cmd/viewer -mode human                     # play yourself
 go run ./cmd/viewer -mode training -run mine        # watch a run, live or finished
 ```
 
-Keys are listed in [docs/VIEWER.md](docs/VIEWER.md). Trained agents are included in `agents/`: two placement agents (`raw`, `ddqn_s0`) and three move agents (`moves_nb_s0`, `moves_nb_s0_final`, `moves_nb_s1`). To show your own, run `python export.py mine` (placement) or `export_moves.py` (moves) in `training/`.
+Keys are listed in [docs/VIEWER.md](docs/VIEWER.md). Trained agents are included in `agents/`: two placement agents (`raw`, `ddqn_s0`) and seven move agents (`moves_nb_s0`, `moves_nb_s0_final`, `moves_nb_s1`, `moves_nb_s2`, `moves_nb_s2_final`, `moves_bs001_s0`, `moves_bs001_s0_final`; see docs/MOVES.md for which is which). To show your own, run `python export.py mine` (placement) or `export_moves.py` (moves) in `training/`.
 
 ## Docs
 

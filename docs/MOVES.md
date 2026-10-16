@@ -1,6 +1,6 @@
 # Phase 8: an agent that uses the whole game (hold, tucks, spins, T-spins)
 
-The placement agents only choose a column and rotation for a straight drop. This phase gives the agent every way a player can lock a piece. Status: **a learned agent now works, but only when the network cannot see the board.** The runs that failed are kept below so nobody repeats them.
+The placement agents only choose a column and rotation for a straight drop. This phase gives the agent every way a player can lock a piece. Status: **a learned agent works, with three training seeds. It learns reliably when the network cannot see the board, and the board can only be added back if its inputs are scaled down 100 times.** The runs that failed are kept below so nobody repeats them.
 
 ![Move agent after 100,000 steps](media/moves_late.gif)
 
@@ -26,15 +26,19 @@ Seeds 1-100, 3000-piece cap, greedy play. These seeds were never trained on. Mov
 | Learned move agent, seed 0, final (100k) | 241,493 | 984.9 | 2,481 | 66/100 | 97.4 | 233.4 | 730.4 |
 | Learned move agent, seed 0, best validation (90k) | 206,816 | 812.6 | 2,057 | 42/100 | 100.5 | 222.8 | 795.9 |
 | Learned move agent, seed 1 (best = final, 100k) | 236,973 | 912.9 | 2,308 | 54/100 | 102.7 | 253.9 | 931.6 |
+| Learned move agent, seed 2, best validation (80k) | 285,432 | 1,157.0 | 2,905 | 94/100 | 98.3 | 312.7 | 1,204.7 |
+| Learned move agent, seed 2, final (100k) | 104,800 | 406.1 | 1,046 | 8/100 | 100.2 | 105.7 | 415.3 |
+| Board visible at scale 0.01, best validation (90k) | 69,820 | 333.4 | 875 | 1/100 | 79.8 | 80.8 | 363.9 |
+| Board visible at scale 0.01, final (100k) | 121,679 | 573.9 | 1,474 | 21/100 | 82.5 | 140.1 | 578.6 |
 
 What this shows and what it does not:
 
-- **Both learned agents score more than the scripted agent that already uses everything** (241k and 237k against 164k), with about 100 points per piece against 55. They do it with T-spins: 233 and 254 per game, against 70. At 400 points or more each, that is at least 93,000 points of the 241,000 for seed 0. I did not split the score further.
-- **They are less robust.** The scripted agent reached the cap in every game; the learned ones in 66 and 54 of 100. Their worst games ended after 70 and 137 pieces. Their line rate is the same as everyone else's (0.40 lines per piece for all three), so they are not clearing more lines, they are scoring more per line cleared and dying more often.
+- **The board-hidden agents score more than the scripted agent that already uses everything, except when a late checkpoint collapses** (seed 0 final 241k, seed 1 237k, seed 2 best 285k, against 164k), with about 100 points per piece against 55. They do it with T-spins: 233, 254 and 313 per game, against 70. At 400 points or more each, that is at least 93,000 points of the 241,000 for seed 0. I did not split the score further.
+- **They are less robust, and how much depends on the checkpoint.** The scripted agent reached the cap in every game; the learned ones in 66, 54 and 94 of 100 (and 8 for the collapsed seed 2 final). Their line rate is the same as everyone else's when they survive (0.40 lines per piece), so they are not clearing more lines, they are scoring more per line cleared and dying more often.
 - **Clear sizes shifted too** (`go run ./cmd/baseline -agent agents/moves_nb_s0_final.json`): doubles are 48% of cleared lines for seed 0 (single 34%, triple 13%, tetris 4.5%), against 90% singles for the scripted agent.
-- **Two training seeds, both learned.** Seed 0 was at 496 of 500 pieces in validation by 30k steps and seed 1 at 498.5 by 70k, so the speed varies. I have no third seed.
-- **Picking the "best" checkpoint on 10 validation games was noisy.** For seed 0 the checkpoint chosen at 90k scored 206,816 on seeds 1-100 and the final one 241,493. Treat the best-validation rows as a warning about the selection, not as a fair second result.
-- **The agent cannot see the board**, only height, holes, bumpiness, lines, the held piece and the next piece after each candidate move. It finds T-spins because the move list already contains them with their 400+ reward; the network never has to spot a T-slot, it only has to keep the stack in a shape where such moves appear. This is my reading, I did not test it.
+- **Three training seeds, all learned.** In validation, seed 0 was at 496 of 500 pieces by 30k steps, seed 2 at 500 by 50k and seed 1 at 498.5 by 70k, so the speed varies.
+- **Late training is unstable and the "best" checkpoint, picked on 10 validation games, is a noisy choice in both directions.** Seed 0: the pick (90k) scored 206,816 on seeds 1-100, the final network 241,493. Seed 2: the pick (80k) scored 285,432, the final network 104,800 and reached the cap in only 8 of 100 games. All three board-hidden runs held about 500 pieces in validation for a while, and seeds 0 and 2 dipped at 100k. Over the three seeds the means are 243,074 for the best-validation picks and 194,422 for the final networks; the spread between checkpoints of one run is as large as the gap to the scripted agent. I would use more validation games and a decaying learning rate before trusting a single network.
+- **The board-hidden agents cannot see the board**, only height, holes, bumpiness, lines, the held piece and the next piece after each candidate move. It finds T-spins because the move list already contains them with their 400+ reward; the network never has to spot a T-slot, it only has to keep the stack in a shape where such moves appear. This is my reading, I did not test it.
 
 ## Training runs
 
@@ -50,8 +54,11 @@ Validation is 10 greedy games on seeds 5001-5010, 500-piece cap, every 10k steps
 | `moves_bait_s0` | warm + penalty 5, zero-line T-spins paid nothing in training, board visible; stopped at 20k | 80 / 0 / 15.2 / 0.2 / 4.8 | 0 / 0 / 13.8 / 0 / 4.9 | |
 | **`moves_nb_s0`** | warm + penalty 5, **board hidden** (`--no-board`) | 7,120 / 24.0 / 95.7 / 10.9 / 29.1 | 27,610 / 120.2 / 344.1 / 35.5 / 147.7 | 43,680 / 189.4 / 496.0 / 54.3 / 217.1 |
 | **`moves_nb_s1`** | same, seed 1 | 2,050 / 3.3 / 34.2 / 4.3 / 10.0 | 6,570 / 19.8 / 88.4 / 10.7 / 32.3 | 13,960 / 60.5 / 192.9 / 18.2 / 70.6 |
+| **`moves_nb_s2`** | same, seed 2 | 4,090 / 9.9 / 58.1 / 7.5 / 19.5 | 4,640 / 11.8 / 65.3 / 8.4 / 23.4 | 31,440 / 126.2 / 350.4 / 40.3 / 133.8 |
+| `moves_bs01_s0` | warm + penalty 5, board visible at **scale 0.1**; stopped at 40k | 1,370 / 0.5 / 31.2 / 3.3 / 6.5 | 1,010 / 0.5 / 28.8 / 2.4 / 7.3 | 1,470 / 0.7 / 29.2 / 3.5 / 7.9 |
+| **`moves_bs001_s0`** | warm + penalty 5, board visible at **scale 0.01** | 1,800 / 0.8 / 33.0 / 4.2 / 9.4 | 2,620 / 4.9 / 49.1 / 5.3 / 18.0 | 3,230 / 11.6 / 58.7 / 4.9 / 20.5 |
 
-`moves_nb_s0` went on to 47,700 at 60k, 49,020 at 90k and 44,500 at 100k; `moves_nb_s1` reached 52,370 at 100k with all 500 pieces survived.
+`moves_nb_s0` went on to 47,700 at 60k, 49,020 at 90k and 44,500 at 100k; `moves_nb_s1` reached 52,370 at 100k with all 500 pieces survived. `moves_nb_s2` held 500 pieces from 50k to 90k (45,070 to 48,280) and fell to 39,540 (409 pieces) at 100k. `moves_bs001_s0` stayed under 140 pieces until 70k, reached 189 at 80k, 486 at 90k (38,550) and ended at 470 pieces (38,190).
 
 Controls that rule out a pipeline bug:
 
@@ -63,7 +70,7 @@ Controls that rule out a pipeline bug:
 
 Training degraded a network that started out playing well, in every run where the 200 board cells were an input. The hypotheses, with what was found:
 
-1. **Board input.** Hiding the board is the only change that made training work (`moves_nb_*`), on two seeds. That supports "the raw board is the problem", but I did not isolate why. "The 200 inputs add noise that swamps small differences between candidates" is one reading; too much capacity or a learning rate that is wrong for those inputs are others. A lower learning rate with the board visible (`moves_lowlr_s0`) was stopped after one check (29.8 pieces at 10k, no real learning), which is not conclusive.
+1. **Board input: confirmed as the cause, mechanism still open.** Hiding the board made training work on three seeds (`moves_nb_*`). Scaling the board inputs down also works, but only a lot: at 0.1 the run stayed flat (31 pieces at 40k, stopped), at 0.01 it learned, late (the jump came between 80k and 90k steps) and to a weaker agent than the board-hidden ones (best checkpoint 70k points on seeds 1-100, 1 of 100 games at the cap; the final one 122k, 21 of 100; clears are 91-94% singles). With Adam, scaling an input by s makes its weights change s times as much per step, so this says the board weights move too fast at normal scale. It does not say whether the cause is noise, capacity or the interaction with the warm start. Looking at the finished scale-0.01 network explains how it plays (mean change of the value per unit of each input, over the states it visited in seeds 1-3, compared with the seed 2 board-hidden network): holes -0.02 against -1.14, aggregate height -0.65 against +0.13, bumpiness -0.21 against -0.05, and each of the 200 board cells about 0.41 (up to 1.2), so one filled cell moves the value about twenty times more than one hole. It nearly ignores holes and attaches value to individual cells, which fits the tall one-column towers with holes under them in its games. My reading is that it memorises cell positions instead of learning a general rule, and that it had too little time at that level (it was under 140 pieces until 70k steps); neither is tested. A lower learning rate on every weight (`moves_lowlr_s0`, 1e-4) was stopped after one check (29.8 pieces at 10k) and is not conclusive.
 2. **Zero-line T-spin bait: rejected as the cause.** Paying nothing for them in training (`moves_bait_s0`, board visible) still failed, and worse (13.8 pieces at 20k, no T-spins at all). The board-hidden agents learn with the 400 points on offer.
 3. **Value scale and the game-over target.** A finished game used to bootstrap to exactly 0, which beats the negative values of a warm-started net; the death penalty of 5 is in every run since the second warm start and did not fix the board-visible runs. `train_moves.py` now logs the mean, min and max of the learned values to TensorBoard (`train/value_*`); I did not look at them.
 4. **Update dynamics** (128-candidate max over a bootstrapped target, target sync every 1000 steps): not investigated. The placement DQN used the same scheme and worked on 4 features.
@@ -77,13 +84,13 @@ Do not redo: cold vs warm, with/without the death penalty at lr 1e-3 with the bo
 - `Replay` stores the 200 board cells bit-packed (43 bytes per candidate) so 50k transitions x 128 candidates fit in about 300 MB.
 - Speed: about 25-40 environment steps/s with one run alone (100k steps take 40-60 minutes), slower when runs share the machine.
 - Seeds: training games 1,000,000+; validation 5001-5010; final comparison seeds 1-100. Same as the placement agents.
-- Flags: `--cold`, `--no-board`, `--zero-tspin-bait`, `--death-penalty`, `--lr`, `--update-every`, `--steps`, `--name`, `--seed`. Checkpoints `training/checkpoints/<name>_best.pt` (best validation) and `<name>.pt`; TensorBoard in `training/runs/<name>`; viewer data in `viewdata/<name>/`. All git-ignored.
+- Flags: `--cold`, `--no-board`, `--board-scale`, `--zero-tspin-bait`, `--death-penalty`, `--lr`, `--update-every`, `--steps`, `--name`, `--seed`. Checkpoints `training/checkpoints/<name>_best.pt` (best validation) and `<name>.pt`; TensorBoard in `training/runs/<name>`; viewer data in `viewdata/<name>/`. All git-ignored.
 
 ```
 go run ./cmd/server
 cd training
 python train_moves.py --name moves_nb_s0 --no-board
-python export_moves.py moves_nb_s0 --no-board --final     # writes ../agents/moves_nb_s0_final.json
+python export_moves.py moves_nb_s0 --no-board --final     # writes ../agents/moves_nb_s0_final.json (add --board-scale 0.01 instead of --no-board for that run type)
 cd .. && go run ./cmd/baseline -agent agents/moves_nb_s0_final.json -games 100 -max-pieces 3000
 go run ./cmd/viewer -mode training -run moves_nb_s0
 ```
@@ -97,4 +104,4 @@ go run ./cmd/viewer -mode training -run moves_nb_s0
 - After a hold from an empty slot the "next piece" feature is zero (unknown); this is intentional.
 - Viewer replays store placements, so move-agent games and human games cannot be saved.
 - The agent sees one next piece even though the engine and viewer now queue five.
-- Open: an agent that sees the board and still learns (small learning rate only on the board weights, or compact slot features such as column heights and wells instead of 200 raw cells); more than two seeds; a longer cap or a survival-focused measure, since 34-46% of the learned games end before 3000 pieces; whether a death penalty larger than 5 improves robustness.
+- Open: why the final networks dip (more validation games, a learning-rate decay, averaging checkpoints); an agent that sees the board and plays as well as the board-hidden ones (compact slot features such as column heights and wells instead of 200 raw cells, or board scales between 0.1 and 0.01); whether a death penalty larger than 5 improves robustness; a survival-focused measure.
