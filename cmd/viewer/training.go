@@ -122,10 +122,10 @@ func (a *app) drawTraining(screen *ebiten.Image) {
 		last = fmt.Sprintf("last episode: score %.0f lines %.0f pieces %.0f, epsilon %.2f", e.Score, e.Lines, e.Pieces, e.Epsilon)
 	}
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("run %s (%d/%d): %s%s\nstep %d, %d episodes, snapshot %d/%d\n%s",
-		r.Name, s.RunIdx+1, len(s.Runs), state, follow, r.LastStep(), len(r.Episodes), s.AgentIdx+1, len(r.Snapshots), last), trainX, 84)
+		r.Name, s.RunIdx+1, len(s.Runs), state, follow, r.LastStep(), len(r.Episodes), s.AgentIdx+1, len(r.Snapshots), last), trainX, 100)
 
 	marker := s.SnapshotStep()
-	drawChart(screen, trainX, 150, trainW, 120, "training score per episode (moving average)", marker,
+	drawChart(screen, trainX, 168, trainW, 102, "training score per episode (moving average)", marker,
 		series{smoothedEpisodes(r, func(e trainlog.Episode) float64 { return e.Score }), runColors[s.RunIdx%len(runColors)], 2})
 
 	var all []series
