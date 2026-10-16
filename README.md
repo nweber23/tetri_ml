@@ -37,7 +37,7 @@ Training never depends on rendering.
 
 ## Setup
 
-Needs Go 1.25+ and Python 3.11. Tested on Windows 11 only.
+Needs Go 1.25+ and Python 3.11. Tested on Windows 11 and Linux.
 
 ```bash
 go test ./...
