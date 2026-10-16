@@ -91,9 +91,10 @@ Keys are listed in [docs/VIEWER.md](docs/VIEWER.md). Two trained agents are incl
 - [BRIDGE.md](docs/BRIDGE.md): the Go-Python bridge, how it was verified, throughput
 - [DQN.md](docs/DQN.md) and [EXPERIMENTS.md](docs/EXPERIMENTS.md): training results
 - [VIEWER.md](docs/VIEWER.md): viewer controls and limits
+- [MOVES.md](docs/MOVES.md): the full-game agent (hold, tucks, spins, T-spins): what works and what failed
 
 ## Limits
 
-- Actions are placements (a rotation and a column per piece), so the agent never tucks or spins. This keeps training fast but caps how good it can play.
-- No hold piece, no lock delay, and gravity is one row per step in the environment.
+- The trained agents in this README choose placements (a rotation and a column per piece), so they never tuck, spin or hold. An agent that uses the whole game is the open problem of [docs/MOVES.md](docs/MOVES.md): the search, the bridge and a scripted baseline work, a learned one does not yet.
+- The training environments have no lock delay, and `Tetris-v0` applies one gravity row per step. The viewer's human mode adds hold, a lock delay, a ghost piece and a five-piece preview.
 - Results come from 3 training seeds per variant at most, and evaluation is capped at 3000 pieces, which hides differences between the strongest agents.
