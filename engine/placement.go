@@ -43,7 +43,7 @@ func (g *Game) Place(pl Placement) (reward int, done bool) {
 	if g.done || !g.board.fits(p) {
 		return 0, g.done
 	}
-	g.cur = p
+	g.cur, g.lastRot = p, false
 	return g.Step(HardDrop)
 }
 

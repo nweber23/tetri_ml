@@ -191,3 +191,46 @@ func TestApplyDoesNotFall(t *testing.T) {
 		t.Error("Gravity did not drop the piece one row")
 	}
 }
+
+func TestTSpinScoring(t *testing.T) {
+	lock := func(rotated bool, corners int) (*Game, int) {
+		g := New(1)
+		g.cur = Piece{Kind: T, X: 3, Y: 5}
+		for _, c := range [][2]int{{0, 0}, {2, 0}, {0, 2}, {2, 2}}[:corners] {
+			g.board[5+c[1]][3+c[0]] = 1
+		}
+		g.lastRot = rotated
+		return g, g.Lock()
+	}
+	if g, r := lock(true, 3); r != 400 || !g.State().TSpin {
+		t.Errorf("rotated into 3 corners: reward %d tspin %v, want 400 true", r, g.State().TSpin)
+	}
+	if g, r := lock(true, 2); r != 0 || g.State().TSpin {
+		t.Errorf("2 corners: reward %d tspin %v, want 0 false", r, g.State().TSpin)
+	}
+	if g, r := lock(false, 3); r != 0 || g.State().TSpin {
+		t.Errorf("not rotated: reward %d tspin %v, want 0 false", r, g.State().TSpin)
+	}
+}
+
+func TestHold(t *testing.T) {
+	g := New(1)
+	first, next := g.State().Piece.Kind, g.State().Next
+	if !g.Hold() {
+		t.Fatal("first hold refused")
+	}
+	if st := g.State(); st.Hold != first || !st.HasHold || st.Piece.Kind != next {
+		t.Errorf("after first hold: %+v, want hold %d piece %d", st, first, next)
+	}
+	if g.Hold() {
+		t.Error("second hold on the same piece allowed")
+	}
+	g.Apply(HardDrop)
+	cur := g.State().Piece.Kind
+	if !g.Hold() {
+		t.Fatal("hold refused after the piece locked")
+	}
+	if st := g.State(); st.Piece.Kind != first || st.Hold != cur {
+		t.Errorf("swap: piece %d hold %d, want piece %d hold %d", st.Piece.Kind, st.Hold, first, cur)
+	}
+}

@@ -49,3 +49,34 @@ func (b *Board) clearLines() int {
 	}
 	return cleared
 }
+
+// tCorners counts the occupied corners (walls and floor count) of a T piece's 3x3 box.
+func (b *Board) tCorners(p Piece) int {
+	n := 0
+	for _, c := range [4]Point{{0, 0}, {2, 0}, {0, 2}, {2, 2}} {
+		x, y := p.X+c.X, p.Y+c.Y
+		if x < 0 || x >= Width || y < 0 || y >= Height || b[y][x] != 0 {
+			n++
+		}
+	}
+	return n
+}
+
+// rotate turns p by turns quarter turns clockwise using the SRS kick tests.
+// It reports false if the piece is an O or no kick fits.
+func (b *Board) rotate(p Piece, turns int) (Piece, bool) {
+	if p.Kind == O {
+		return p, false
+	}
+	to := (p.Rot + turns) % 4
+	kicks := kicksJLSTZ
+	if p.Kind == I {
+		kicks = kicksI
+	}
+	for _, k := range kicks[[2]int{p.Rot, to}] {
+		if q := (Piece{p.Kind, to, p.X + k.X, p.Y + k.Y}); b.fits(q) {
+			return q, true
+		}
+	}
+	return p, false
+}
