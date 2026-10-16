@@ -27,6 +27,8 @@
 > - **T-spins.** A T piece that ends on a rotation with three of its four corners blocked scores 400, 800, 1200 or 1600 for 0 to 3 lines. This is the simple three-corner rule, with no mini T-spins.
 > - **Ghost piece** showing where a piece would land.
 >
+> - **Five-piece preview.** The engine now queues the next five pieces and the viewer shows them in a column. The piece order is unchanged (same 7-bag, one draw per piece), so every seeded result above still holds; the agents still only see the next piece.
+>
 > The playable game does not touch training: the agent still plays through the placement API, which never rotates in place, so every number above is unchanged. The engine's `Step` still locks immediately; the lock delay lives in the viewer.
 
 ## 6. New section: "Giving the agent the whole game" (what worked and what did not)
@@ -35,13 +37,27 @@
 >
 > **A scripted baseline already benefits.** The same four hand-set heuristic weights, now choosing among all moves, reached the 1,000-piece cap in all 20 games (the placement version did in 96 of 100) and made about 24 T-spins and 292 holds per game, without knowing what a T-spin is. The weights say nothing about them; the search simply finds them.
 >
-> **The learned agent has not learned yet.** I gave the network the board, the held piece and the next piece as input, because four summary features cannot describe a T-slot. In four runs (random initialisation, heuristic warm start, with and without a game-over penalty) it stayed at about 22 pieces per game, which is what random play does, while the placement agent reaches the cap within 10,000 steps. The pipeline is not the cause: a hand-built network with the heuristic weights survives all 500 pieces through the same code, and so does the untrained warm-started network. Training itself degrades it. My leading suspects, not yet tested: the 200 raw board inputs add noise that swamps small differences between candidate moves, and a zero-line T-spin pays 400 points, which baits a greedy policy. Two follow-up runs (board hidden; lower learning rate) were still going when I wrote this.
+> **The learned agent failed four times, then worked when I hid the board.** I gave the network the board, the held piece and the next piece as input, because four summary features cannot describe a T-slot. In four runs (random initialisation, heuristic warm start, with and without a game-over penalty) it stayed at about 22 pieces per game, which is what random play does, while the placement agent reaches the cap within 10,000 steps. The pipeline was not the cause: a hand-built network with the heuristic weights survives all 500 pieces through the same code, and so does the untrained warm-started network. Training itself degraded it.
+>
+> I had two suspects. First, the 200 raw board inputs add noise that swamps small differences between candidate moves. Second, a zero-line T-spin pays 400 points, more than a double, which could bait a greedy policy. I tested them one at a time. Paying nothing for zero-line T-spins did not help (the run was worse, 14 pieces per game at 20,000 steps). A lower learning rate with the board visible did not obviously help either, but I stopped it after one check, so I do not count it. **Hiding the board from the network did**: at 30,000 steps it survived 496 of 500 pieces in validation, with 189 lines, 54 T-spins and 217 holds per game, and a second training seed learned too, a little later. I can say that the raw board input is what breaks learning; I cannot say why. Noise is my guess, but too much capacity or a mismatched learning rate would look the same from where I stand.
+>
+> **The result, on the 100 seeds the agent never trained on, with a 3,000-piece cap:**
+>
+> | Agent | Score | Lines | Pieces | Reached the cap | Score / piece | T-spins / game |
+> |---|---|---|---|---|---|---|
+> | Placement DQN | 173,983 | 1,173 | 2,948 | 96/100 | 59.0 | - |
+> | Scripted agent choosing among all moves | 164,331 | 1,199 | 3,000 | 100/100 | 54.8 | 70 |
+> | Learned move agent, seed 0 | 241,493 | 985 | 2,481 | 66/100 | 97.4 | 233 |
+> | Learned move agent, seed 1 | 236,973 | 913 | 2,308 | 54/100 | 102.7 | 254 |
+>
+> The learned agents score about 45% more than the scripted one, and they get there with T-spins, which pay 400 to 1,600 points: 233 or 254 per game against 70, so at least 93,000 of seed 0's 241,000 points. They do not clear more lines (0.40 per piece, the same as every other agent) and they are **less robust**: they die before 3,000 pieces in a third to a half of the games, where the scripted agent never does. A higher score and a worse survival rate is a trade, not a clear win, and the score is partly my reward design: a zero-line T-spin pays 400, so an agent can be paid well for a risky stack.
+>
+> Two details worth keeping. The agent is blind to the board, so it does not find T-spin slots by looking; I think it finds them because the move list already contains them with their reward, but I did not test that. And choosing the "best" checkpoint by 10 validation games was noisy: for seed 0 the checkpoint picked that way scored 206,816 on the 100 seeds, the last one 241,493.
 
-(Fill in the outcome of those two runs before publishing. If a learned move agent works, replace the last paragraph with its numbers: score and lines at the 3,000-piece cap, T-spins and holds per game, against the heuristic-moves baseline above. Full record in `docs/MOVES.md`.)
-
-Also update "Limits": hold, lock delay and T-spins exist in the human mode, and the search lets a scripted agent use them; a learned agent does not yet (see section 6).
+Also update "Limits": hold, lock delay and T-spins exist in the human mode, and the search lets both a scripted agent and a learned one (with the board hidden from its network) use them (see section 6). The learned move agent has two training seeds, ends early in a third to a half of 3,000-piece games, and cannot see the board.
 
 ## Also change
 
 - Results table: add a "Score / piece" column (43.4, 59.0, 58.5).
+- Add the GIFs of the move agent (`docs/media/moves_early.gif`, `moves_mid.gif`, `moves_late.gif`: untrained warm start, 20,000 steps, 100,000 steps, same seed) next to the placement ones; the placement GIFs were re-recorded with the five-piece preview.
 - Limits: "Tested on Windows 11 only" is out of date; the README now says Windows and Linux.

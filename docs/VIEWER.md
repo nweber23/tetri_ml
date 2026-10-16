@@ -55,7 +55,7 @@ cd training
 python export.py raw ddqn_s0     # reads checkpoints/<name>_best.pt and runs/<name>, writes ../agents/<name>.json
 ```
 
-`agents/raw.json` and `agents/ddqn_s0.json` are committed. Each file carries test vectors computed by PyTorch, and `go test ./agent` checks that the Go network reproduces them.
+`agents/raw.json` and `agents/ddqn_s0.json` (placement agents) and `agents/moves_nb_s0.json`, `moves_nb_s0_final.json` and `moves_nb_s1.json` (move agents, see [MOVES.md](MOVES.md)) are committed. Each file carries test vectors computed by PyTorch, and `go test ./agent` checks that the Go network reproduces them.
 
 ## Limits
 
