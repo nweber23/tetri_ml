@@ -20,10 +20,10 @@ HEURISTIC = [-0.510066, -0.35663, -0.184483, 0.760666]  # heuristic.Default: agg
 
 
 class MoveNet(nn.Module):
-    def __init__(self, hidden: int = 128, warm_start: bool = True, use_board: bool = True):
+    def __init__(self, hidden: int = 128, warm_start: bool = True, board_scale: float = 1.0):
         super().__init__()
-        self.use_board = use_board
-        self.register_buffer("visible", torch.ones(MOVE_FEATURES).index_fill_(0, torch.arange(4, 204), float(use_board)), persistent=False)
+        self.board_scale = board_scale  # 0 hides the 200 board cells, a small value makes the network adapt to them slowly
+        self.register_buffer("visible", torch.ones(MOVE_FEATURES).index_fill_(0, torch.arange(4, 204), board_scale), persistent=False)
         self.mlp = nn.Sequential(
             nn.Linear(MOVE_FEATURES, hidden), nn.ReLU(),
             nn.Linear(hidden, hidden // 2), nn.ReLU(),

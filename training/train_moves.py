@@ -31,6 +31,7 @@ def main():
     p.add_argument("--death-penalty", type=float, default=5.0, help="value of a finished game, in units of 100 points")
     p.add_argument("--cold", action="store_true", help="random initial weights instead of the heuristic warm start")
     p.add_argument("--no-board", action="store_true", help="hide the 200 board cells from the network")
+    p.add_argument("--board-scale", type=float, default=1.0, help="multiply the board inputs by this; below 1 the board weights effectively learn more slowly (Adam)")
     p.add_argument("--zero-tspin-bait", action="store_true", help="train as if zero-line T-spins paid nothing (reported scores stay real)")
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--batch", type=int, default=128)
@@ -49,7 +50,7 @@ def main():
 
     rng = np.random.default_rng(args.seed)
     torch.manual_seed(args.seed)
-    net = MoveNet(warm_start=not args.cold, use_board=not args.no_board)
+    net = MoveNet(warm_start=not args.cold, board_scale=0.0 if args.no_board else args.board_scale)
     target_net = copy.deepcopy(net)
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
     replay = Replay(args.buffer)

@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 import torch
 
-from dqn_moves import MAX_MOVES, MOVE_FEATURES, MoveNet, Replay, best_move, pack, training_rewards, unpack, update
+from dqn_moves import BOARD, MAX_MOVES, MOVE_FEATURES, MoveNet, Replay, agent_doc, best_move, pack, training_rewards, unpack, update
 
 
 class TestMoveDQN(unittest.TestCase):
@@ -13,6 +13,18 @@ class TestMoveDQN(unittest.TestCase):
         info = {"rewards": np.array([400, 800, 100, 0], np.float32), "bait": np.array([True, False, False, False])}
         self.assertEqual(training_rewards(info, True).tolist(), [0, 800, 100, 0])
         self.assertEqual(training_rewards(info, False).tolist(), [400, 800, 100, 0])
+
+    def test_board_scale_is_baked_into_the_exported_weights(self):
+        torch.manual_seed(0)
+        net = MoveNet(warm_start=False, board_scale=0.1)
+        w = torch.tensor(agent_doc(net, "x")["layers"][0]["w"])
+        raw = net.mlp[0].weight
+        self.assertTrue(torch.allclose(w[:, BOARD], raw[:, BOARD] * 0.1))
+        self.assertTrue(torch.equal(w[:, :4], raw[:, :4]))
+        # the exported plain MLP gives the same value as the scaled network
+        x = torch.rand(3, MOVE_FEATURES)
+        exported = torch.relu(x / torch.tensor(agent_doc(net, "x")["scale"]) @ w.T + net.mlp[0].bias)
+        self.assertTrue(torch.allclose(exported, torch.relu(net.mlp[0](x / net.mlp[0].weight.new_tensor(agent_doc(net, "x")["scale"]) * net.visible)), atol=1e-5))
 
     def test_pack_round_trip(self):
         f = np.random.default_rng(0).integers(0, 2, (3, MAX_MOVES, MOVE_FEATURES), dtype=np.uint8)

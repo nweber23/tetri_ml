@@ -18,6 +18,7 @@ p = argparse.ArgumentParser()
 p.add_argument("names", nargs="+")
 p.add_argument("--out", default="../agents")
 p.add_argument("--no-board", action="store_true", help="the run hid the board from the network (its board weights were never trained)")
+p.add_argument("--board-scale", type=float, default=1.0, help="the run's --board-scale")
 p.add_argument("--final", action="store_true")
 args = p.parse_args()
 
@@ -25,7 +26,7 @@ out = Path(args.out)
 out.mkdir(exist_ok=True)
 rng = np.random.default_rng(0)
 for name in args.names:
-    net = MoveNet(warm_start=False, use_board=not args.no_board)
+    net = MoveNet(warm_start=False, board_scale=0.0 if args.no_board else args.board_scale)
     net.load_state_dict(torch.load(f"checkpoints/{name}.pt" if args.final else f"checkpoints/{name}_best.pt"))
     label = f"{name}_final" if args.final else name
     doc = agent_doc(net, label)
