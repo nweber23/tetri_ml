@@ -29,7 +29,7 @@ func (g *Game) Moves() []Move {
 	}
 	moves := g.search(g.cur, false)
 	if !g.holdUsed {
-		k := g.next
+		k := g.queue[0]
 		if g.hasHold {
 			k = g.hold
 		}

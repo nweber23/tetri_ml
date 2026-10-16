@@ -234,3 +234,48 @@ func TestHold(t *testing.T) {
 		t.Errorf("swap: piece %d hold %d, want piece %d hold %d", st.Piece.Kind, st.Hold, first, cur)
 	}
 }
+
+func TestPreviewIsWhatComesNext(t *testing.T) {
+	g := New(4)
+	pre := g.State().Preview
+	if pre[0] != g.State().Next {
+		t.Fatalf("Next %v is not Preview[0] %v", g.State().Next, pre[0])
+	}
+	for i, want := range pre {
+		g.Step(HardDrop)
+		if got := g.State().Piece.Kind; got != want {
+			t.Fatalf("piece %d after the preview was taken: got %v, preview said %v", i, got, want)
+		}
+	}
+}
+
+func TestPreviewDoesNotChangeThePieceSequence(t *testing.T) {
+	// The sequence must be the bag's, one pop per piece, however far ahead the queue looks.
+	g := New(11)
+	b := newBag(11)
+	if got, want := g.State().Piece.Kind, b.pop(); got != want {
+		t.Fatalf("first piece %v, bag gives %v", got, want)
+	}
+	for i := 0; i < 12; i++ {
+		g.Place(g.Placements()[i%len(g.Placements())])
+		if g.State().Done {
+			t.Fatalf("game ended after %d pieces", i)
+		}
+		if got, want := g.State().Piece.Kind, b.pop(); got != want {
+			t.Fatalf("piece %d: %v, bag gives %v", i+1, got, want)
+		}
+	}
+}
+
+func TestHoldFromEmptySlotTakesFromTheQueue(t *testing.T) {
+	g := New(2)
+	before := g.State()
+	g.Hold()
+	after := g.State()
+	if after.Piece.Kind != before.Preview[0] || after.Hold != before.Piece.Kind {
+		t.Errorf("hold gave %v and held %v, want %v and %v", after.Piece.Kind, after.Hold, before.Preview[0], before.Piece.Kind)
+	}
+	if after.Preview[0] != before.Preview[1] || after.Preview[PreviewSize-2] != before.Preview[PreviewSize-1] {
+		t.Errorf("queue did not shift by one: %v -> %v", before.Preview, after.Preview)
+	}
+}

@@ -14,6 +14,9 @@ const (
 	NumActions
 )
 
+// PreviewSize is how many upcoming pieces a game keeps queued and shows in State.Preview.
+const PreviewSize = 5
+
 // lineScores is the reward for clearing 0..4 lines at once.
 var lineScores = [5]int{0, 100, 300, 500, 800}
 
@@ -24,7 +27,7 @@ var tSpinScores = [4]int{400, 800, 1200, 1600}
 type State struct {
 	Board  Board
 	Piece  Piece
-	Next   Kind
+	Next   Kind // the piece after Piece, the same as Preview[0]
 	Score  int
 	Lines  int
 	Pieces int // pieces locked so far
@@ -34,13 +37,15 @@ type State struct {
 	HasHold   bool
 	LastClear int  // lines cleared by the most recent lock
 	TSpin     bool // whether the most recent lock was a T-spin
+
+	Preview [PreviewSize]Kind // the next PreviewSize pieces in the order they will come
 }
 
 // Game is a single deterministic Tetris game. Create one with New or Reset it with a seed.
 type Game struct {
 	board  Board
 	cur    Piece
-	next   Kind
+	queue  [PreviewSize]Kind // upcoming pieces, topped up from the bag as they are taken
 	bag    *bag
 	score  int
 	lines  int
@@ -64,14 +69,16 @@ func New(seed uint64) *Game {
 // Reset starts a fresh game. The same seed always yields the same piece sequence.
 func (g *Game) Reset(seed uint64) State {
 	*g = Game{bag: newBag(seed)}
-	g.next = g.bag.pop()
+	for i := range g.queue {
+		g.queue[i] = g.bag.pop()
+	}
 	g.spawn()
 	return g.State()
 }
 
 // State returns a snapshot of the current game.
 func (g *Game) State() State {
-	return State{g.board, g.cur, g.next, g.score, g.lines, g.pieces, g.done, g.hold, g.hasHold, g.lastClear, g.tSpin}
+	return State{g.board, g.cur, g.queue[0], g.score, g.lines, g.pieces, g.done, g.hold, g.hasHold, g.lastClear, g.tSpin, g.queue}
 }
 
 // Step applies the action, then one gravity tick: the piece falls one row, or
@@ -143,8 +150,7 @@ func (g *Game) Hold() bool {
 	if g.hasHold {
 		g.cur = spawnPiece(g.hold)
 	} else {
-		g.cur = spawnPiece(g.next)
-		g.next = g.bag.pop()
+		g.cur = spawnPiece(g.takeNext())
 	}
 	g.hold, g.hasHold, g.holdUsed, g.lastRot = k, true, true, false
 	if !g.board.fits(g.cur) {
@@ -212,12 +218,18 @@ func (g *Game) lock() int {
 
 // spawn puts the next piece in the hidden rows above the field, horizontally centered.
 func (g *Game) spawn() {
-	k := g.next
-	g.next = g.bag.pop()
-	g.cur = spawnPiece(k)
+	g.cur = spawnPiece(g.takeNext())
 	if !g.board.fits(g.cur) {
 		g.done = true
 	}
+}
+
+// takeNext removes the first queued piece and tops the queue up from the bag, so the piece order does not depend on how far ahead the queue looks.
+func (g *Game) takeNext() Kind {
+	k := g.queue[0]
+	copy(g.queue[:], g.queue[1:])
+	g.queue[PreviewSize-1] = g.bag.pop()
+	return k
 }
 
 func spawnPiece(k Kind) Piece {
