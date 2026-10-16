@@ -15,7 +15,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 import tetris_env  # noqa: F401
-from dqn_moves import MoveNet, Replay, agent_doc, best_move, evaluate, update
+from dqn_moves import MoveNet, Replay, agent_doc, best_move, evaluate, training_rewards, update
 from viewlog import RunLog
 
 TRAIN_SEED_BASE = 1_000_000
@@ -31,6 +31,7 @@ def main():
     p.add_argument("--death-penalty", type=float, default=5.0, help="value of a finished game, in units of 100 points")
     p.add_argument("--cold", action="store_true", help="random initial weights instead of the heuristic warm start")
     p.add_argument("--no-board", action="store_true", help="hide the 200 board cells from the network")
+    p.add_argument("--zero-tspin-bait", action="store_true", help="train as if zero-line T-spins paid nothing (reported scores stay real)")
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--batch", type=int, default=128)
     p.add_argument("--buffer", type=int, default=50_000)
@@ -68,19 +69,24 @@ def main():
         if rng.random() < eps:
             action = int(rng.choice(np.flatnonzero(info["action_mask"])))
         else:
-            action = best_move(net, info["features"], info["rewards"], info["action_mask"])
+            action = best_move(net, info["features"], training_rewards(info, args.zero_tspin_bait), info["action_mask"])
         chosen = info["features"][action]
 
         _, score_gain, terminated, _, info = env.step(action)
         truncated = not terminated and info["pieces"] >= args.max_pieces
-        replay.add(chosen, terminated, info["features"], info["rewards"], info["action_mask"])
+        replay.add(chosen, terminated, info["features"], training_rewards(info, args.zero_tspin_bait), info["action_mask"])
         episode_score += score_gain
 
         if replay.size >= args.warmup and step % args.update_every == 0:
-            loss = update(net, target_net, optimizer, replay.sample(args.batch, rng), args.death_penalty)
+            batch = replay.sample(args.batch, rng)
+            loss = update(net, target_net, optimizer, batch, args.death_penalty)
             if step % 100 == 0:
                 writer.add_scalar("train/loss", loss, step)
                 log.loss(step, loss)
+                with torch.no_grad():  # the scale of the learned values, to spot drift or collapse
+                    u = net(batch[0])
+                for name, v in (("mean", u.mean()), ("min", u.min()), ("max", u.max())):
+                    writer.add_scalar(f"train/value_{name}", v.item(), step)
         if step % args.target_every == 0:
             target_net.load_state_dict(net.state_dict())
 
@@ -100,7 +106,7 @@ def main():
             log.snapshot(step, net)
 
         if step % args.eval_every == 0:
-            result = evaluate(net, eval_env, VALIDATION_SEEDS, args.eval_max_pieces)
+            result = evaluate(net, eval_env, VALIDATION_SEEDS, args.eval_max_pieces, args.zero_tspin_bait)
             for k, v in result.items():
                 writer.add_scalar(f"validation/{k}", v, step)
             log.validation(step, result["score"], result["lines"], result["pieces"])

@@ -30,6 +30,19 @@ def tearDownModule():
     _tmp.cleanup()
 
 
+class TestMoveEnv(unittest.TestCase):
+    def test_moves_info(self):
+        env = gym.make("Tetris-v1", addr=ADDR)
+        self.addCleanup(env.close)
+        _, info = env.reset(seed=1)
+        mask = info["action_mask"]
+        self.assertTrue(mask.any())
+        self.assertFalse(info["bait"][~mask].any())
+        self.assertEqual(info["features"].shape[0], info["bait"].shape[0])
+        _, _, _, _, info = env.step(int(np.flatnonzero(mask)[0]))
+        self.assertEqual(info["pieces"], 1)
+
+
 class TestTetrisEnv(unittest.TestCase):
     def setUp(self):
         self.env = gym.make("Tetris-v0", addr=ADDR)

@@ -103,6 +103,11 @@ class Replay:
                 f(self.next_rewards[idx, :n]), f(mask[:, :n]))
 
 
+def training_rewards(info, zero_bait: bool):
+    """The move rewards the agent learns from; with zero_bait, zero-line T-spins are worth nothing to it."""
+    return np.where(info["bait"], 0.0, info["rewards"]).astype(np.float32) if zero_bait else info["rewards"]
+
+
 def move_values(net, features, rewards, mask):
     """r / 100 + gamma * U for each move, -inf where there is no move."""
     return (rewards / 100.0 + GAMMA * net(features)).masked_fill(~mask, -torch.inf)
@@ -127,14 +132,14 @@ def update(net, target_net, optimizer, batch, death_penalty: float = 0.0) -> flo
     return loss.item()
 
 
-def evaluate(net: MoveNet, env, seeds, max_pieces: int) -> dict:
-    """Greedy games on the given seeds; averages of score, lines, pieces, T-spins and holds used."""
+def evaluate(net: MoveNet, env, seeds, max_pieces: int, zero_bait: bool = False) -> dict:
+    """Greedy games on the given seeds; averages of score, lines, pieces, T-spins and holds used (real scores)."""
     totals = np.zeros(5)
     for seed in seeds:
         _, info = env.reset(seed=seed)
         done = False
         while not done and info["pieces"] < max_pieces:
-            a = best_move(net, info["features"], info["rewards"], info["action_mask"])
+            a = best_move(net, info["features"], training_rewards(info, zero_bait), info["action_mask"])
             _, _, done, _, info = env.step(a)
         totals += [info["score"], info["lines"], info["pieces"], info["tspins"], info["holds"]]
     avg = totals / len(seeds)

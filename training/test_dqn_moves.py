@@ -5,10 +5,15 @@ import unittest
 import numpy as np
 import torch
 
-from dqn_moves import MAX_MOVES, MOVE_FEATURES, MoveNet, Replay, best_move, pack, unpack, update
+from dqn_moves import MAX_MOVES, MOVE_FEATURES, MoveNet, Replay, best_move, pack, training_rewards, unpack, update
 
 
 class TestMoveDQN(unittest.TestCase):
+    def test_zero_bait_only_removes_zero_line_tspins(self):
+        info = {"rewards": np.array([400, 800, 100, 0], np.float32), "bait": np.array([True, False, False, False])}
+        self.assertEqual(training_rewards(info, True).tolist(), [0, 800, 100, 0])
+        self.assertEqual(training_rewards(info, False).tolist(), [400, 800, 100, 0])
+
     def test_pack_round_trip(self):
         f = np.random.default_rng(0).integers(0, 2, (3, MAX_MOVES, MOVE_FEATURES), dtype=np.uint8)
         f[..., :4] = 200  # the four scalar features are bytes, not bits

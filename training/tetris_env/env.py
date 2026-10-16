@@ -92,7 +92,8 @@ class MoveEnv(gym.Env):
     An action is an index into the moves the server listed for the current state.
     `info["action_mask"]` marks the real ones, `info["features"]` (MAX_MOVES x
     MOVE_FEATURES, uint8) is the network input for the state after each move and
-    `info["rewards"]` the score each move would give. The reward is the score
+    `info["rewards"]` the score each move would give. `info["bait"]` marks the zero-line
+    T-spins, which pay 400 without clearing anything. The reward is the score
     gained (line clears 100/300/500/800, T-spins 400-1600). `info["tspins"]` and
     `info["holds"]` count how often the episode's moves were T-spins or used hold.
     """
@@ -119,13 +120,15 @@ class MoveEnv(gym.Env):
         mask = np.zeros(MAX_MOVES, bool)
         features = np.zeros((MAX_MOVES, MOVE_FEATURES), np.uint8)
         rewards = np.zeros(MAX_MOVES, np.float32)
+        bait = np.zeros(MAX_MOVES, bool)
         for i, m in enumerate(res.moves):
             mask[i] = True
             features[i] = np.frombuffer(m.features, np.uint8)
             rewards[i] = m.reward
+            bait[i] = m.t_spin and m.lines == 0
         s = res.state
         obs = {"board": np.frombuffer(s.board, np.uint8).reshape(HEIGHT, WIDTH), "piece": s.piece, "next": s.next}
-        info = {"action_mask": mask, "features": features, "rewards": rewards, "score": s.score,
+        info = {"action_mask": mask, "features": features, "rewards": rewards, "bait": bait, "score": s.score,
                 "lines": s.lines, "pieces": s.pieces, "tspins": self._tspins, "holds": self._holds}
         return obs, res.reward, s.done, info
 
