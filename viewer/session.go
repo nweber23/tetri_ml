@@ -33,11 +33,14 @@ func (m Mode) String() string {
 const (
 	gravityInterval = 500 * time.Millisecond
 	stepInterval    = 300 * time.Millisecond // between agent or replay placements at speed 1
+	lockDelay       = 500 * time.Millisecond // a grounded piece locks after this long without moving
+	keyInterval     = 70 * time.Millisecond  // between keys when a move agent steers a piece, at speed 1
+	maxLockResets   = 15                     // moves or rotations on the ground that restart the lock delay
 )
 
 // Input is what the player did this frame; key repeat is handled by the caller.
 type Input struct {
-	Left, Right, RotateCW, RotateCCW, HardDrop bool
+	Left, Right, RotateCW, RotateCCW, HardDrop, SoftDrop, Hold bool
 }
 
 type Session struct {
@@ -52,6 +55,12 @@ type Session struct {
 	Scores   []agent.Scored // the agent's value for each candidate placement of the current piece
 	BestIdx  int            // index into Scores of the placement the agent will play, or -1
 
+	// A move agent (slides, spins, hold) steers the piece key by key instead of dropping it.
+	MoveScores []agent.ScoredMove // its candidate moves for the current piece
+	Plan       *engine.Move       // the move it is playing, nil between moves
+	planKeys   []engine.Action    // keys of Plan still to send
+	holdDone   bool               // Plan's hold has been played
+
 	Runs   []*trainlog.Run // training runs the viewer can follow
 	RunIdx int
 	Follow bool // in training mode, jump to each new snapshot as training writes it
@@ -63,6 +72,9 @@ type Session struct {
 	Played    []engine.Placement // placements of the current agent game, for saving
 
 	gravityAcc, stepAcc time.Duration
+	lockAcc             time.Duration // time the current piece has been grounded
+	lockResets          int
+	lockPieces          int // pieces locked when lockAcc was last reset
 }
 
 // New starts a session in agent mode if there are agents, otherwise human mode.
@@ -204,13 +216,21 @@ func (s *Session) Restart(seed uint64) {
 	}
 	s.Game.Reset(seed)
 	s.Played, s.ReplayPos = nil, 0
-	s.gravityAcc, s.stepAcc = 0, 0
+	s.gravityAcc, s.stepAcc, s.lockAcc, s.lockResets = 0, 0, 0, 0
 	s.prepare()
 }
 
 // prepare scores the current piece's placements so the viewer can show them before the agent plays.
 func (s *Session) prepare() {
-	s.Scores, s.BestIdx = nil, -1
+	s.Scores, s.BestIdx, s.MoveScores, s.Plan, s.planKeys, s.holdDone = nil, -1, nil, nil, nil, false
+	if (s.Mode == AgentPlay || s.Mode == Training) && s.Agent() != nil && s.Agent().PlaysMoves() {
+		if !s.Game.State().Done {
+			s.MoveScores = s.Agent().EvaluateMoves(s.Game)
+			s.Plan = &s.MoveScores[agent.BestMove(s.MoveScores)].Move
+			s.planKeys = s.Plan.Keys
+		}
+		return
+	}
 	if (s.Mode == AgentPlay || s.Mode == Training) && s.Agent() != nil && !s.Game.State().Done {
 		s.Scores = s.Agent().Evaluate(s.Game)
 		s.BestIdx = agent.Best(s.Scores)
@@ -225,6 +245,13 @@ func (s *Session) Update(dt time.Duration, in Input) {
 	case Human:
 		s.updateHuman(dt, in)
 	case AgentPlay, Training:
+		if s.Agent() != nil && s.Agent().PlaysMoves() {
+			s.stepAcc += time.Duration(float64(dt) * s.Speed)
+			for ; s.stepAcc >= keyInterval && s.Plan != nil; s.stepAcc -= keyInterval {
+				s.stepMove()
+			}
+			return
+		}
 		s.stepAcc += time.Duration(float64(dt) * s.Speed)
 		for s.stepAcc >= stepInterval && s.BestIdx >= 0 {
 			s.stepAcc -= stepInterval
@@ -243,19 +270,59 @@ func (s *Session) Update(dt time.Duration, in Input) {
 	}
 }
 
+// stepMove sends the move agent's next key: the hold, then each key, then the lock.
+func (s *Session) stepMove() {
+	switch {
+	case s.Plan.Hold && !s.holdDone:
+		s.Game.Hold()
+		s.holdDone = true
+	case len(s.planKeys) > 0:
+		s.Game.Apply(s.planKeys[0])
+		s.planKeys = s.planKeys[1:]
+	default:
+		s.Game.Lock()
+		s.prepare()
+	}
+}
+
 func (s *Session) updateHuman(dt time.Duration, in Input) {
+	g := s.Game
+	before := g.State().Piece
+	if in.Hold && g.Hold() {
+		s.lockAcc, s.lockResets = 0, 0
+		before = g.State().Piece
+	}
 	for _, a := range []struct {
 		pressed bool
 		action  engine.Action
 	}{{in.Left, engine.Left}, {in.Right, engine.Right}, {in.RotateCW, engine.RotateCW}, {in.RotateCCW, engine.RotateCCW}, {in.HardDrop, engine.HardDrop}} {
 		if a.pressed {
-			s.Game.Apply(a.action)
+			g.Apply(a.action)
 		}
+	}
+	moved := g.State().Piece != before
+	if st := g.State(); st.Pieces != s.lockPieces || st.Done {
+		s.lockAcc, s.lockResets, s.lockPieces = 0, 0, st.Pieces // hard drop locked it, or the piece changed
+		return
+	}
+	if in.SoftDrop {
+		g.SoftDrop()
 	}
 	s.gravityAcc += dt
 	for s.gravityAcc >= gravityInterval {
 		s.gravityAcc -= gravityInterval
-		s.Game.Gravity()
+		g.SoftDrop()
+	}
+	if !g.Grounded() {
+		s.lockAcc = 0
+		return
+	}
+	if moved && s.lockResets < maxLockResets {
+		s.lockAcc, s.lockResets = 0, s.lockResets+1
+	}
+	if s.lockAcc += dt; s.lockAcc >= lockDelay {
+		g.Lock()
+		s.lockAcc, s.lockResets, s.lockPieces = 0, 0, g.State().Pieces
 	}
 }
 

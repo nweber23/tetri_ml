@@ -10,7 +10,7 @@ import (
 
 // keepFlat prefers few holes and low, flat stacks.
 func keepFlat() *agent.Agent {
-	return &agent.Agent{Name: "flat", Scale: [4]float64{1, 1, 1, 1},
+	return &agent.Agent{Name: "flat", Scale: []float64{1, 1, 1, 1},
 		Layers: []agent.Layer{{W: [][]float64{{-1, -5, -1, 3}}, B: []float64{0}}}}
 }
 
@@ -83,5 +83,66 @@ func TestSaveReplayOnlyForAgentGames(t *testing.T) {
 	s := New(1, nil, nil)
 	if _, err := s.SaveReplay(t.TempDir()); err == nil {
 		t.Error("human games should not be saved")
+	}
+}
+
+// ground drops the piece until it rests on the floor, without locking it.
+func ground(s *Session) {
+	for s.Game.SoftDrop() {
+	}
+}
+
+func TestLockDelay(t *testing.T) {
+	s := New(1, nil, nil)
+	ground(s)
+	s.Update(lockDelay-time.Millisecond, Input{})
+	if s.Game.State().Pieces != 0 {
+		t.Fatal("piece locked before the delay passed")
+	}
+	s.Update(2*time.Millisecond, Input{})
+	if s.Game.State().Pieces != 1 {
+		t.Fatal("piece did not lock after the delay")
+	}
+}
+
+func TestLockDelayResetsOnMoveUpToCap(t *testing.T) {
+	s := New(1, nil, nil)
+	ground(s)
+	for i := 0; i < maxLockResets; i++ {
+		s.Update(lockDelay-time.Millisecond, Input{Left: i%2 == 0, Right: i%2 == 1})
+		if s.Game.State().Pieces != 0 {
+			t.Fatalf("locked despite a move %d", i)
+		}
+	}
+	s.Update(lockDelay-time.Millisecond, Input{Left: true}) // no resets left, so the time adds up
+	if s.Game.State().Pieces != 1 {
+		t.Error("piece never locked after the resets ran out")
+	}
+}
+
+// zeroMoveAgent is a move agent that values every state the same, so it plays the first move it finds.
+func zeroMoveAgent() *agent.Agent {
+	return &agent.Agent{Name: "zero", Scale: make([]float64, agent.NumMoveFeatures), // scales are replaced below
+		Layers: []agent.Layer{{W: [][]float64{make([]float64, agent.NumMoveFeatures)}, B: []float64{0}}}}
+}
+
+func TestMoveAgentSteersKeyByKey(t *testing.T) {
+	a := zeroMoveAgent()
+	for i := range a.Scale {
+		a.Scale[i] = 1
+	}
+	s := New(1, []*agent.Agent{a}, nil)
+	if s.Plan == nil || len(s.Plan.Keys) == 0 {
+		t.Fatalf("no plan: %+v", s.Plan)
+	}
+	s.Update(keyInterval, Input{})
+	if s.Game.State().Pieces != 0 {
+		t.Fatal("the piece locked after one key")
+	}
+	for i := 0; i < 2000 && !s.Game.State().Done; i++ { // it stacks up and dies, which is fine
+		s.Update(keyInterval, Input{})
+	}
+	if s.Game.State().Pieces < 5 {
+		t.Errorf("only %d pieces locked", s.Game.State().Pieces)
 	}
 }

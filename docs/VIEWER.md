@@ -19,7 +19,7 @@ go run ./cmd/viewer -mode training -run show -snapshot 20000 -speed 2 -record ou
 | `[` `]` | previous or next agent checkpoint, same seed, so checkpoints can be compared on one game |
 | P, `+`, `-` | pause, double or halve the agent and replay speed |
 | S | save the current agent game to `replays/<agent>_<seed>.json` |
-| Arrows, Up or X, Z, Space | human mode: move, soft drop, rotate, rotate back, hard drop |
+| Arrows, Up or X, Z, C, Space | human mode: move and soft drop, rotate, rotate back, hold, hard drop |
 
 The heatmap shows the agent's value for every candidate placement of the current piece (row = rotation, column = x, green is high, the white outline is the placement it plays, also outlined on the board). The learning-curve panel shows the validation score recorded during that agent's training.
 
@@ -58,6 +58,7 @@ python export.py raw ddqn_s0     # reads checkpoints/<name>_best.pt and runs/<na
 ## Limits
 
 - Replays store the seed and the placements, so only agent games can be saved. Human games use slides and rotations that a straight-drop placement cannot reproduce.
-- Human mode has gravity on a 500 ms timer and no lock delay, as in the engine.
+- Human mode has gravity on a 500 ms timer and a 500 ms lock delay that restarts on every move or rotation, at most 15 times per piece. The delay lives in the viewer session; `engine.Step` still locks at once, so training is unchanged.
+- Human mode also has a hold piece (once per piece, `engine.Hold`), a ghost outline, and T-spin scoring (`engine.State.TSpin`): a T that ends on a rotation with 3 of its 4 box corners blocked scores 400/800/1200/1600 for 0/1/2/3 lines. There is no distinction between T-spins and mini T-spins, and no kick-based special case. The placement API the agents use never rotates in place, so agents never score T-spins and their numbers are unaffected.
 - Human vs. agent (listed as optional in the plan) is not built.
 - The window itself was checked through screenshots of the three modes, not by playing it by hand.

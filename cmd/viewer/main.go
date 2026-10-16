@@ -232,9 +232,8 @@ func (a *app) Update() error {
 		RotateCW:  inpututil.IsKeyJustPressed(ebiten.KeyArrowUp) || inpututil.IsKeyJustPressed(ebiten.KeyX),
 		RotateCCW: inpututil.IsKeyJustPressed(ebiten.KeyZ),
 		HardDrop:  inpututil.IsKeyJustPressed(ebiten.KeySpace),
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) && s.Mode == viewer.Human {
-		s.Game.Gravity() // soft drop
+		SoftDrop:  ebiten.IsKeyPressed(ebiten.KeyArrowDown),
+		Hold:      inpututil.IsKeyJustPressed(ebiten.KeyC),
 	}
 	s.Update(time.Second/time.Duration(ebiten.TPS()), in)
 	return nil
@@ -304,10 +303,24 @@ func (a *app) drawBoard(screen *ebiten.Image) {
 			}
 		}
 	}
+	if m := a.s.Plan; m != nil { // outline where the move agent will lock the piece
+		for _, c := range m.Piece.Cells() {
+			if c.Y < engine.VisibleHeight {
+				vector.StrokeRect(screen, float32(boardX+c.X*cell)+2, float32(boardY+(engine.VisibleHeight-1-c.Y)*cell)+2, cell-4, cell-4, 2, color.White, false)
+			}
+		}
+	}
 	if a.s.BestIdx >= 0 { // outline where the agent will drop the piece
 		for _, c := range a.s.Game.Landing(a.s.Scores[a.s.BestIdx].Placement).Cells() {
 			if c.Y < engine.VisibleHeight {
 				vector.StrokeRect(screen, float32(boardX+c.X*cell)+2, float32(boardY+(engine.VisibleHeight-1-c.Y)*cell)+2, cell-4, cell-4, 2, color.White, false)
+			}
+		}
+	}
+	if !st.Done && a.s.Mode == viewer.Human { // ghost: where the piece lands if dropped now
+		for _, c := range a.s.Game.Landing(engine.Placement{Rot: st.Piece.Rot, X: st.Piece.X}).Cells() {
+			if c.Y < engine.VisibleHeight {
+				vector.StrokeRect(screen, float32(boardX+c.X*cell)+2, float32(boardY+(engine.VisibleHeight-1-c.Y)*cell)+2, cell-4, cell-4, 1, kindColors[st.Piece.Kind], false)
 			}
 		}
 	}
@@ -318,11 +331,22 @@ func (a *app) drawBoard(screen *ebiten.Image) {
 			}
 		}
 	}
-	ebitenutil.DebugPrintAt(screen, "next", boardX, boardY+engine.VisibleHeight*cell+8)
-	cells := nextCells(st.Next)
+	drawPreview(screen, "next", boardX, st.Next)
+	if st.HasHold {
+		drawPreview(screen, "hold", boardX+110, st.Hold)
+	} else {
+		ebitenutil.DebugPrintAt(screen, "hold", boardX+110, boardY+engine.VisibleHeight*cell+8)
+	}
+}
+
+// drawPreview draws a small piece under the board next to a label.
+func drawPreview(screen *ebiten.Image, label string, x int, k engine.Kind) {
+	y := boardY + engine.VisibleHeight*cell + 8
+	ebitenutil.DebugPrintAt(screen, label, x, y)
+	cells := nextCells(k)
 	minY := min(cells[0].Y, cells[1].Y, cells[2].Y, cells[3].Y)
 	for _, c := range cells {
-		vector.FillRect(screen, float32(boardX+50+c.X*14), float32(boardY+engine.VisibleHeight*cell+8+(1-(c.Y-minY))*14), 13, 13, kindColors[st.Next], false)
+		vector.FillRect(screen, float32(x+50+c.X*14), float32(y+(1-(c.Y-minY))*14), 13, 13, kindColors[k], false)
 	}
 }
 
@@ -349,8 +373,13 @@ func (a *app) drawInfo(screen *ebiten.Image) {
 	}
 	text := fmt.Sprintf("mode: %s%s\nagent: %s\nseed: %d   speed: x%g\nscore %d   lines %d   pieces %d",
 		s.Mode, status, name, seedOf(s), s.Speed, st.Score, st.Lines, st.Pieces)
+	if st.TSpin {
+		text += fmt.Sprintf("\nlast clear: T-SPIN, %d lines", st.LastClear)
+	} else if st.LastClear > 0 {
+		text += fmt.Sprintf("\nlast clear: %d lines", st.LastClear)
+	}
 	ebitenutil.DebugPrintAt(screen, text, 300, 10)
-	help := "Tab mode  N new seed  [ ] agent/snapshot  R next run  F follow live  P pause  +/- speed  S save replay\nHuman: arrows move, up/X rotate, Z rotate back, space drop"
+	help := "Tab mode  N new seed  [ ] agent/snapshot  R next run  F follow live  P pause  +/- speed  S save replay\nHuman: arrows move/soft drop, up/X rotate, Z rotate back, C hold, space drop"
 	ebitenutil.DebugPrintAt(screen, help, 20, screenH-30)
 	if a.message != "" {
 		ebitenutil.DebugPrintAt(screen, a.message, 300, screenH-50)
@@ -365,9 +394,14 @@ func seedOf(s *viewer.Session) uint64 {
 }
 
 func (a *app) drawHeatmap(screen *ebiten.Image) {
-	ebitenutil.DebugPrintAt(screen, "agent value per placement (row = rotation, column = x)", mapX, mapY-16)
+	ebitenutil.DebugPrintAt(screen, "agent value per placement (row = rotation, column = x); move agents: current plan", mapX, mapY-16)
 	vector.FillRect(screen, mapX, mapY, 12*mapCell, 4*mapCell, panel, false)
 	s := a.s
+	if m := s.Plan; m != nil {
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("move agent: %d candidate moves\nplaying: %d keys%s%s\nscore for the move: %d",
+			len(s.MoveScores), len(m.Keys), map[bool]string{true: ", hold", false: ""}[m.Hold], map[bool]string{true: ", T-SPIN", false: ""}[m.TSpin], m.Reward), mapX+10, mapY+20)
+		return
+	}
 	if len(s.Scores) == 0 {
 		ebitenutil.DebugPrintAt(screen, "agent mode only", mapX+10, mapY+50)
 		return
