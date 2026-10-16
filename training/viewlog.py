@@ -10,8 +10,8 @@ from dqn import agent_doc
 
 
 class RunLog:
-    def __init__(self, directory, name: str):
-        self.name = name
+    def __init__(self, directory, name: str, doc=agent_doc):
+        self.name, self._doc = name, doc  # doc turns a network into the viewer's agent JSON
         self.dir = Path(directory)
         (self.dir / "snapshots").mkdir(parents=True, exist_ok=True)
         for old in (self.dir / "snapshots").glob("step_*.json"):
@@ -33,7 +33,7 @@ class RunLog:
     def snapshot(self, step, net):
         path = self.dir / "snapshots" / f"step_{step:09d}.json"
         tmp = path.with_suffix(".tmp")  # write then rename, so the viewer never reads a half-written file
-        tmp.write_text(json.dumps(agent_doc(net, f"{self.name}@{step}")))
+        tmp.write_text(json.dumps(self._doc(net, f"{self.name}@{step}")))
         tmp.replace(path)
 
     def done(self, step):

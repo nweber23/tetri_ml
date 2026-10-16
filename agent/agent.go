@@ -21,14 +21,14 @@ type CurvePoint struct {
 }
 
 type checkCase struct {
-	Features [4]float64 `json:"features"`
-	Value    float64    `json:"value"`
+	Features []float64 `json:"features"`
+	Value    float64   `json:"value"`
 }
 
 // Agent is a ReLU MLP over the features of a placement's afterstate.
 type Agent struct {
 	Name   string       `json:"name"`
-	Scale  [4]float64   `json:"scale"`
+	Scale  []float64    `json:"scale"` // input scaling; 4 inputs for a placement agent, NumMoveFeatures for a move agent
 	Layers []Layer      `json:"layers"`
 	Curve  []CurvePoint `json:"curve"` // validation score during training
 	Check  []checkCase  `json:"check"` // inputs with the values PyTorch produced
@@ -51,6 +51,9 @@ func Load(path string) (*Agent, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	in := len(a.Scale)
+	if in != 4 && in != NumMoveFeatures {
+		return nil, fmt.Errorf("%s: %d inputs, want 4 (placement agent) or %d (move agent)", path, in, NumMoveFeatures)
+	}
 	for i, l := range a.Layers {
 		if len(l.W) != len(l.B) {
 			return nil, fmt.Errorf("%s: layer %d has %d weight rows but %d biases", path, i, len(l.W), len(l.B))
@@ -69,7 +72,7 @@ func Load(path string) (*Agent, error) {
 }
 
 // Value is the network's value of an afterstate with the given features.
-func (a *Agent) Value(f [4]float64) float64 {
+func (a *Agent) Value(f []float64) float64 {
 	x := make([]float64, len(f))
 	for i := range f {
 		x[i] = f[i] / a.Scale[i]
@@ -97,7 +100,7 @@ func (a *Agent) Evaluate(g *engine.Game) []Scored {
 	for _, pl := range g.Placements() {
 		b, lines := g.Afterstate(pl)
 		f := heuristic.Extract(b, lines)
-		v := a.Value([4]float64{float64(f.AggregateHeight), float64(f.Holes), float64(f.Bumpiness), float64(f.Lines)})
+		v := a.Value([]float64{float64(f.AggregateHeight), float64(f.Holes), float64(f.Bumpiness), float64(f.Lines)})
 		out = append(out, Scored{pl, f, v})
 	}
 	return out
@@ -108,6 +111,41 @@ func Best(scored []Scored) int {
 	best := -1
 	for i, s := range scored {
 		if best < 0 || s.Value > scored[best].Value {
+			best = i
+		}
+	}
+	return best
+}
+
+// PlaysMoves reports whether the agent chooses among engine.Moves (slides, spins, hold) rather than straight-drop placements.
+func (a *Agent) PlaysMoves() bool { return len(a.Scale) == NumMoveFeatures }
+
+// ScoredMove is one candidate move with the network's value of the state after it.
+type ScoredMove struct {
+	Move  engine.Move
+	Value float64
+}
+
+// EvaluateMoves scores every move of g, in Moves order. Reward is not added:
+// the network values the afterstate, and the caller adds the move's own reward.
+func (a *Agent) EvaluateMoves(g *engine.Game) []ScoredMove {
+	moves := g.Moves()
+	out := make([]ScoredMove, len(moves))
+	x := make([]float64, NumMoveFeatures)
+	for i, m := range moves {
+		for j, v := range MoveFeatures(g, m) {
+			x[j] = float64(v)
+		}
+		out[i] = ScoredMove{m, a.Value(x)}
+	}
+	return out
+}
+
+// BestMove returns the index of the move with the highest reward plus afterstate value, or -1 if there is none.
+func BestMove(scored []ScoredMove) int {
+	best := -1
+	for i, s := range scored {
+		if best < 0 || float64(s.Move.Reward)/100+s.Value > float64(scored[best].Move.Reward)/100+scored[best].Value {
 			best = i
 		}
 	}

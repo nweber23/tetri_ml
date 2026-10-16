@@ -80,3 +80,71 @@ class TetrisEnv(gym.Env):
     def close(self):
         self._requests.put(None)
         self._channel.close()
+
+
+MAX_MOVES = 128  # the server never offers more
+MOVE_FEATURES = 4 + 200 + 7 + 7  # see agent.MoveFeatures in Go
+
+
+class MoveEnv(gym.Env):
+    """Full-game Tetris: every way to lock a piece, including slides, tucks, spins and hold.
+
+    An action is an index into the moves the server listed for the current state.
+    `info["action_mask"]` marks the real ones, `info["features"]` (MAX_MOVES x
+    MOVE_FEATURES, uint8) is the network input for the state after each move and
+    `info["rewards"]` the score each move would give. The reward is the score
+    gained (line clears 100/300/500/800, T-spins 400-1600). `info["tspins"]` and
+    `info["holds"]` count how often the episode's moves were T-spins or used hold.
+    """
+
+    metadata = {"render_modes": []}
+
+    def __init__(self, addr: str = "127.0.0.1:50051"):
+        self.observation_space = spaces.Dict({
+            "board": spaces.Box(0, NUM_KINDS, (HEIGHT, WIDTH), np.uint8),
+            "piece": spaces.Discrete(NUM_KINDS),
+            "next": spaces.Discrete(NUM_KINDS),
+        })
+        self.action_space = spaces.Discrete(MAX_MOVES)
+        self._channel = grpc.insecure_channel(addr)
+        self._requests = queue.SimpleQueue()
+        self._responses = pb_grpc.TetrisStub(self._channel).PlayMoves(iter(self._requests.get, None))
+        self._moves = []
+        self._tspins = self._holds = 0
+
+    def _call(self, request):
+        self._requests.put(request)
+        res = next(self._responses)
+        self._moves = res.moves
+        mask = np.zeros(MAX_MOVES, bool)
+        features = np.zeros((MAX_MOVES, MOVE_FEATURES), np.uint8)
+        rewards = np.zeros(MAX_MOVES, np.float32)
+        for i, m in enumerate(res.moves):
+            mask[i] = True
+            features[i] = np.frombuffer(m.features, np.uint8)
+            rewards[i] = m.reward
+        s = res.state
+        obs = {"board": np.frombuffer(s.board, np.uint8).reshape(HEIGHT, WIDTH), "piece": s.piece, "next": s.next}
+        info = {"action_mask": mask, "features": features, "rewards": rewards, "score": s.score,
+                "lines": s.lines, "pieces": s.pieces, "tspins": self._tspins, "holds": self._holds}
+        return obs, res.reward, s.done, info
+
+    def reset(self, *, seed=None, options=None):
+        super().reset(seed=seed)
+        self._tspins = self._holds = 0
+        game_seed = seed if seed is not None else int(self.np_random.integers(2**63))
+        obs, _, _, info = self._call(pb.MoveRequest(start=pb.Reset(seed=game_seed)))
+        return obs, info
+
+    def step(self, action):
+        action = int(action)
+        if not 0 <= action < len(self._moves):
+            raise ValueError(f"invalid action {action}")
+        self._tspins += self._moves[action].t_spin
+        self._holds += self._moves[action].hold
+        obs, reward, done, info = self._call(pb.MoveRequest(move=action))
+        return obs, float(reward), done, False, info
+
+    def close(self):
+        self._requests.put(None)
+        self._channel.close()

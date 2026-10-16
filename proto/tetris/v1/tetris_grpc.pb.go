@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Tetris_Play_FullMethodName = "/tetris.v1.Tetris/Play"
+	Tetris_Play_FullMethodName      = "/tetris.v1.Tetris/Play"
+	Tetris_PlayMoves_FullMethodName = "/tetris.v1.Tetris/PlayMoves"
 )
 
 // TetrisClient is the client API for Tetris service.
@@ -29,6 +30,9 @@ const (
 // Tetris runs one game per Play stream. The client must send Reset first.
 type TetrisClient interface {
 	Play(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[Request, Response], error)
+	// PlayMoves is the full-game variant: the agent picks among every reachable way
+	// to lock a piece (slides, tucks, spins, T-spins, hold), not just straight drops.
+	PlayMoves(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[MoveRequest, MoveResponse], error)
 }
 
 type tetrisClient struct {
@@ -52,6 +56,19 @@ func (c *tetrisClient) Play(ctx context.Context, opts ...grpc.CallOption) (grpc.
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Tetris_PlayClient = grpc.BidiStreamingClient[Request, Response]
 
+func (c *tetrisClient) PlayMoves(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[MoveRequest, MoveResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Tetris_ServiceDesc.Streams[1], Tetris_PlayMoves_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[MoveRequest, MoveResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Tetris_PlayMovesClient = grpc.BidiStreamingClient[MoveRequest, MoveResponse]
+
 // TetrisServer is the server API for Tetris service.
 // All implementations must embed UnimplementedTetrisServer
 // for forward compatibility.
@@ -59,6 +76,9 @@ type Tetris_PlayClient = grpc.BidiStreamingClient[Request, Response]
 // Tetris runs one game per Play stream. The client must send Reset first.
 type TetrisServer interface {
 	Play(grpc.BidiStreamingServer[Request, Response]) error
+	// PlayMoves is the full-game variant: the agent picks among every reachable way
+	// to lock a piece (slides, tucks, spins, T-spins, hold), not just straight drops.
+	PlayMoves(grpc.BidiStreamingServer[MoveRequest, MoveResponse]) error
 	mustEmbedUnimplementedTetrisServer()
 }
 
@@ -71,6 +91,9 @@ type UnimplementedTetrisServer struct{}
 
 func (UnimplementedTetrisServer) Play(grpc.BidiStreamingServer[Request, Response]) error {
 	return status.Error(codes.Unimplemented, "method Play not implemented")
+}
+func (UnimplementedTetrisServer) PlayMoves(grpc.BidiStreamingServer[MoveRequest, MoveResponse]) error {
+	return status.Error(codes.Unimplemented, "method PlayMoves not implemented")
 }
 func (UnimplementedTetrisServer) mustEmbedUnimplementedTetrisServer() {}
 func (UnimplementedTetrisServer) testEmbeddedByValue()                {}
@@ -100,6 +123,13 @@ func _Tetris_Play_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Tetris_PlayServer = grpc.BidiStreamingServer[Request, Response]
 
+func _Tetris_PlayMoves_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(TetrisServer).PlayMoves(&grpc.GenericServerStream[MoveRequest, MoveResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Tetris_PlayMovesServer = grpc.BidiStreamingServer[MoveRequest, MoveResponse]
+
 // Tetris_ServiceDesc is the grpc.ServiceDesc for Tetris service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -111,6 +141,12 @@ var Tetris_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "Play",
 			Handler:       _Tetris_Play_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "PlayMoves",
+			Handler:       _Tetris_PlayMoves_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

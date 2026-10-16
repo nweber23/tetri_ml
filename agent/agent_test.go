@@ -37,7 +37,7 @@ func TestLoadRejectsBadShapes(t *testing.T) {
 
 func TestEvaluateAndBest(t *testing.T) {
 	// One linear layer that prefers fewer holes.
-	a := &Agent{Scale: [4]float64{1, 1, 1, 1}, Layers: []Layer{{W: [][]float64{{0, -1, 0, 0}}, B: []float64{0}}}}
+	a := &Agent{Scale: []float64{1, 1, 1, 1}, Layers: []Layer{{W: [][]float64{{0, -1, 0, 0}}, B: []float64{0}}}}
 	g := engine.New(1)
 	scored := a.Evaluate(g)
 	if len(scored) != len(g.Placements()) {
@@ -51,5 +51,27 @@ func TestEvaluateAndBest(t *testing.T) {
 	}
 	if Best(nil) != -1 {
 		t.Error("Best(nil) should be -1")
+	}
+}
+
+func TestMoveFeatures(t *testing.T) {
+	g := engine.New(1)
+	st := g.State()
+	for _, m := range g.Moves() {
+		f := MoveFeatures(g, m)
+		if f[3] != uint8(m.Lines) {
+			t.Fatalf("lines feature %d, move cleared %d", f[3], m.Lines)
+		}
+		var held, next int
+		for i := 0; i < 7; i++ {
+			held += int(f[204+i])
+			next += int(f[211+i])
+		}
+		switch {
+		case !m.Hold && (held != 0 || f[211+int(st.Next)] != 1):
+			t.Fatal("plain move: want no held piece and the next piece known")
+		case m.Hold && (f[204+int(st.Piece.Kind)] != 1 || next != 0):
+			t.Fatal("hold from empty: want the current piece held and the next piece unknown")
+		}
 	}
 }

@@ -40,6 +40,11 @@ class TetrisStub:
                 request_serializer=tetris_dot_v1_dot_tetris__pb2.Request.SerializeToString,
                 response_deserializer=tetris_dot_v1_dot_tetris__pb2.Response.FromString,
                 _registered_method=True)
+        self.PlayMoves = channel.stream_stream(
+                '/tetris.v1.Tetris/PlayMoves',
+                request_serializer=tetris_dot_v1_dot_tetris__pb2.MoveRequest.SerializeToString,
+                response_deserializer=tetris_dot_v1_dot_tetris__pb2.MoveResponse.FromString,
+                _registered_method=True)
 
 
 class TetrisServicer:
@@ -52,6 +57,14 @@ class TetrisServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def PlayMoves(self, request_iterator, context):
+        """PlayMoves is the full-game variant: the agent picks among every reachable way
+        to lock a piece (slides, tucks, spins, T-spins, hold), not just straight drops.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_TetrisServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -59,6 +72,11 @@ def add_TetrisServicer_to_server(servicer, server):
                     servicer.Play,
                     request_deserializer=tetris_dot_v1_dot_tetris__pb2.Request.FromString,
                     response_serializer=tetris_dot_v1_dot_tetris__pb2.Response.SerializeToString,
+            ),
+            'PlayMoves': grpc.stream_stream_rpc_method_handler(
+                    servicer.PlayMoves,
+                    request_deserializer=tetris_dot_v1_dot_tetris__pb2.MoveRequest.FromString,
+                    response_serializer=tetris_dot_v1_dot_tetris__pb2.MoveResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -89,6 +107,33 @@ class Tetris:
             '/tetris.v1.Tetris/Play',
             tetris_dot_v1_dot_tetris__pb2.Request.SerializeToString,
             tetris_dot_v1_dot_tetris__pb2.Response.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PlayMoves(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_stream(
+            request_iterator,
+            target,
+            '/tetris.v1.Tetris/PlayMoves',
+            tetris_dot_v1_dot_tetris__pb2.MoveRequest.SerializeToString,
+            tetris_dot_v1_dot_tetris__pb2.MoveResponse.FromString,
             options,
             channel_credentials,
             insecure,

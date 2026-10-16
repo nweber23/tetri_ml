@@ -433,6 +433,228 @@ func (x *State) GetDone() bool {
 	return false
 }
 
+type MoveRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Action:
+	//
+	//	*MoveRequest_Start
+	//	*MoveRequest_Move
+	Action        isMoveRequest_Action `protobuf_oneof:"action"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MoveRequest) Reset() {
+	*x = MoveRequest{}
+	mi := &file_tetris_v1_tetris_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MoveRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MoveRequest) ProtoMessage() {}
+
+func (x *MoveRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_tetris_v1_tetris_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MoveRequest.ProtoReflect.Descriptor instead.
+func (*MoveRequest) Descriptor() ([]byte, []int) {
+	return file_tetris_v1_tetris_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *MoveRequest) GetAction() isMoveRequest_Action {
+	if x != nil {
+		return x.Action
+	}
+	return nil
+}
+
+func (x *MoveRequest) GetStart() *Reset {
+	if x != nil {
+		if x, ok := x.Action.(*MoveRequest_Start); ok {
+			return x.Start
+		}
+	}
+	return nil
+}
+
+func (x *MoveRequest) GetMove() int32 {
+	if x != nil {
+		if x, ok := x.Action.(*MoveRequest_Move); ok {
+			return x.Move
+		}
+	}
+	return 0
+}
+
+type isMoveRequest_Action interface {
+	isMoveRequest_Action()
+}
+
+type MoveRequest_Start struct {
+	Start *Reset `protobuf:"bytes,1,opt,name=start,proto3,oneof"`
+}
+
+type MoveRequest_Move struct {
+	// Index into the moves of the previous response.
+	Move int32 `protobuf:"varint,2,opt,name=move,proto3,oneof"`
+}
+
+func (*MoveRequest_Start) isMoveRequest_Action() {}
+
+func (*MoveRequest_Move) isMoveRequest_Action() {}
+
+type MoveResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	State *State                 `protobuf:"bytes,1,opt,name=state,proto3" json:"state,omitempty"`
+	// Score gained by the request; 0 for Reset.
+	Reward int32 `protobuf:"varint,2,opt,name=reward,proto3" json:"reward,omitempty"`
+	// Every way to lock the current piece or, with hold, the swapped-in piece; empty once done.
+	Moves         []*Move `protobuf:"bytes,3,rep,name=moves,proto3" json:"moves,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MoveResponse) Reset() {
+	*x = MoveResponse{}
+	mi := &file_tetris_v1_tetris_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MoveResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MoveResponse) ProtoMessage() {}
+
+func (x *MoveResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_tetris_v1_tetris_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MoveResponse.ProtoReflect.Descriptor instead.
+func (*MoveResponse) Descriptor() ([]byte, []int) {
+	return file_tetris_v1_tetris_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *MoveResponse) GetState() *State {
+	if x != nil {
+		return x.State
+	}
+	return nil
+}
+
+func (x *MoveResponse) GetReward() int32 {
+	if x != nil {
+		return x.Reward
+	}
+	return 0
+}
+
+func (x *MoveResponse) GetMoves() []*Move {
+	if x != nil {
+		return x.Moves
+	}
+	return nil
+}
+
+type Move struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Hold   bool                   `protobuf:"varint,1,opt,name=hold,proto3" json:"hold,omitempty"`
+	TSpin  bool                   `protobuf:"varint,2,opt,name=t_spin,json=tSpin,proto3" json:"t_spin,omitempty"`
+	Lines  int32                  `protobuf:"varint,3,opt,name=lines,proto3" json:"lines,omitempty"`
+	Reward int32                  `protobuf:"varint,4,opt,name=reward,proto3" json:"reward,omitempty"`
+	// Network input for the state after the move, one byte per feature (see agent.MoveFeatures).
+	Features      []byte `protobuf:"bytes,5,opt,name=features,proto3" json:"features,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Move) Reset() {
+	*x = Move{}
+	mi := &file_tetris_v1_tetris_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Move) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Move) ProtoMessage() {}
+
+func (x *Move) ProtoReflect() protoreflect.Message {
+	mi := &file_tetris_v1_tetris_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Move.ProtoReflect.Descriptor instead.
+func (*Move) Descriptor() ([]byte, []int) {
+	return file_tetris_v1_tetris_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *Move) GetHold() bool {
+	if x != nil {
+		return x.Hold
+	}
+	return false
+}
+
+func (x *Move) GetTSpin() bool {
+	if x != nil {
+		return x.TSpin
+	}
+	return false
+}
+
+func (x *Move) GetLines() int32 {
+	if x != nil {
+		return x.Lines
+	}
+	return 0
+}
+
+func (x *Move) GetReward() int32 {
+	if x != nil {
+		return x.Reward
+	}
+	return 0
+}
+
+func (x *Move) GetFeatures() []byte {
+	if x != nil {
+		return x.Features
+	}
+	return nil
+}
+
 var File_tetris_v1_tetris_proto protoreflect.FileDescriptor
 
 const file_tetris_v1_tetris_proto_rawDesc = "" +
@@ -467,9 +689,24 @@ const file_tetris_v1_tetris_proto_rawDesc = "" +
 	"\x05score\x18\x04 \x01(\x05R\x05score\x12\x14\n" +
 	"\x05lines\x18\x05 \x01(\x05R\x05lines\x12\x16\n" +
 	"\x06pieces\x18\x06 \x01(\x05R\x06pieces\x12\x12\n" +
-	"\x04done\x18\a \x01(\bR\x04done2=\n" +
+	"\x04done\x18\a \x01(\bR\x04done\"W\n" +
+	"\vMoveRequest\x12(\n" +
+	"\x05start\x18\x01 \x01(\v2\x10.tetris.v1.ResetH\x00R\x05start\x12\x14\n" +
+	"\x04move\x18\x02 \x01(\x05H\x00R\x04moveB\b\n" +
+	"\x06action\"u\n" +
+	"\fMoveResponse\x12&\n" +
+	"\x05state\x18\x01 \x01(\v2\x10.tetris.v1.StateR\x05state\x12\x16\n" +
+	"\x06reward\x18\x02 \x01(\x05R\x06reward\x12%\n" +
+	"\x05moves\x18\x03 \x03(\v2\x0f.tetris.v1.MoveR\x05moves\"{\n" +
+	"\x04Move\x12\x12\n" +
+	"\x04hold\x18\x01 \x01(\bR\x04hold\x12\x15\n" +
+	"\x06t_spin\x18\x02 \x01(\bR\x05tSpin\x12\x14\n" +
+	"\x05lines\x18\x03 \x01(\x05R\x05lines\x12\x16\n" +
+	"\x06reward\x18\x04 \x01(\x05R\x06reward\x12\x1a\n" +
+	"\bfeatures\x18\x05 \x01(\fR\bfeatures2\x7f\n" +
 	"\x06Tetris\x123\n" +
-	"\x04Play\x12\x12.tetris.v1.Request\x1a\x13.tetris.v1.Response(\x010\x01B7Z5github.com/nweber23/tetri_ml/proto/tetris/v1;tetrisv1b\x06proto3"
+	"\x04Play\x12\x12.tetris.v1.Request\x1a\x13.tetris.v1.Response(\x010\x01\x12@\n" +
+	"\tPlayMoves\x12\x16.tetris.v1.MoveRequest\x1a\x17.tetris.v1.MoveResponse(\x010\x01B7Z5github.com/nweber23/tetri_ml/proto/tetris/v1;tetrisv1b\x06proto3"
 
 var (
 	file_tetris_v1_tetris_proto_rawDescOnce sync.Once
@@ -483,28 +720,36 @@ func file_tetris_v1_tetris_proto_rawDescGZIP() []byte {
 	return file_tetris_v1_tetris_proto_rawDescData
 }
 
-var file_tetris_v1_tetris_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_tetris_v1_tetris_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_tetris_v1_tetris_proto_goTypes = []any{
-	(*Request)(nil),    // 0: tetris.v1.Request
-	(*Reset)(nil),      // 1: tetris.v1.Reset
-	(*Placement)(nil),  // 2: tetris.v1.Placement
-	(*Response)(nil),   // 3: tetris.v1.Response
-	(*Afterstate)(nil), // 4: tetris.v1.Afterstate
-	(*State)(nil),      // 5: tetris.v1.State
+	(*Request)(nil),      // 0: tetris.v1.Request
+	(*Reset)(nil),        // 1: tetris.v1.Reset
+	(*Placement)(nil),    // 2: tetris.v1.Placement
+	(*Response)(nil),     // 3: tetris.v1.Response
+	(*Afterstate)(nil),   // 4: tetris.v1.Afterstate
+	(*State)(nil),        // 5: tetris.v1.State
+	(*MoveRequest)(nil),  // 6: tetris.v1.MoveRequest
+	(*MoveResponse)(nil), // 7: tetris.v1.MoveResponse
+	(*Move)(nil),         // 8: tetris.v1.Move
 }
 var file_tetris_v1_tetris_proto_depIdxs = []int32{
-	1, // 0: tetris.v1.Request.start:type_name -> tetris.v1.Reset
-	2, // 1: tetris.v1.Request.place:type_name -> tetris.v1.Placement
-	5, // 2: tetris.v1.Response.state:type_name -> tetris.v1.State
-	2, // 3: tetris.v1.Response.placements:type_name -> tetris.v1.Placement
-	4, // 4: tetris.v1.Response.afterstates:type_name -> tetris.v1.Afterstate
-	0, // 5: tetris.v1.Tetris.Play:input_type -> tetris.v1.Request
-	3, // 6: tetris.v1.Tetris.Play:output_type -> tetris.v1.Response
-	6, // [6:7] is the sub-list for method output_type
-	5, // [5:6] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	1,  // 0: tetris.v1.Request.start:type_name -> tetris.v1.Reset
+	2,  // 1: tetris.v1.Request.place:type_name -> tetris.v1.Placement
+	5,  // 2: tetris.v1.Response.state:type_name -> tetris.v1.State
+	2,  // 3: tetris.v1.Response.placements:type_name -> tetris.v1.Placement
+	4,  // 4: tetris.v1.Response.afterstates:type_name -> tetris.v1.Afterstate
+	1,  // 5: tetris.v1.MoveRequest.start:type_name -> tetris.v1.Reset
+	5,  // 6: tetris.v1.MoveResponse.state:type_name -> tetris.v1.State
+	8,  // 7: tetris.v1.MoveResponse.moves:type_name -> tetris.v1.Move
+	0,  // 8: tetris.v1.Tetris.Play:input_type -> tetris.v1.Request
+	6,  // 9: tetris.v1.Tetris.PlayMoves:input_type -> tetris.v1.MoveRequest
+	3,  // 10: tetris.v1.Tetris.Play:output_type -> tetris.v1.Response
+	7,  // 11: tetris.v1.Tetris.PlayMoves:output_type -> tetris.v1.MoveResponse
+	10, // [10:12] is the sub-list for method output_type
+	8,  // [8:10] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_tetris_v1_tetris_proto_init() }
@@ -516,13 +761,17 @@ func file_tetris_v1_tetris_proto_init() {
 		(*Request_Start)(nil),
 		(*Request_Place)(nil),
 	}
+	file_tetris_v1_tetris_proto_msgTypes[6].OneofWrappers = []any{
+		(*MoveRequest_Start)(nil),
+		(*MoveRequest_Move)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_tetris_v1_tetris_proto_rawDesc), len(file_tetris_v1_tetris_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

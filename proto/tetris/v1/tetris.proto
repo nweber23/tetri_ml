@@ -7,6 +7,9 @@ option go_package = "github.com/nweber23/tetri_ml/proto/tetris/v1;tetrisv1";
 // Tetris runs one game per Play stream. The client must send Reset first.
 service Tetris {
   rpc Play(stream Request) returns (stream Response);
+  // PlayMoves is the full-game variant: the agent picks among every reachable way
+  // to lock a piece (slides, tucks, spins, T-spins, hold), not just straight drops.
+  rpc PlayMoves(stream MoveRequest) returns (stream MoveResponse);
 }
 
 message Request {
@@ -53,4 +56,29 @@ message State {
   int32 lines = 5;
   int32 pieces = 6;
   bool done = 7;
+}
+
+message MoveRequest {
+  oneof action {
+    Reset start = 1;
+    // Index into the moves of the previous response.
+    int32 move = 2;
+  }
+}
+
+message MoveResponse {
+  State state = 1;
+  // Score gained by the request; 0 for Reset.
+  int32 reward = 2;
+  // Every way to lock the current piece or, with hold, the swapped-in piece; empty once done.
+  repeated Move moves = 3;
+}
+
+message Move {
+  bool hold = 1;
+  bool t_spin = 2;
+  int32 lines = 3;
+  int32 reward = 4;
+  // Network input for the state after the move, one byte per feature (see agent.MoveFeatures).
+  bytes features = 5;
 }

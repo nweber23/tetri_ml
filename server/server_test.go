@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
+	"github.com/nweber23/tetri_ml/agent"
 	pb "github.com/nweber23/tetri_ml/proto/tetris/v1"
 )
 
@@ -88,5 +89,46 @@ func TestInvalidPlacement(t *testing.T) {
 	stream.Send(place(&pb.Placement{Rot: 0, X: 99}))
 	if _, err := stream.Recv(); status.Code(err) != codes.InvalidArgument {
 		t.Errorf("got %v, want InvalidArgument", err)
+	}
+}
+
+func TestPlayMoves(t *testing.T) {
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := grpc.NewServer()
+	pb.RegisterTetrisServer(s, &Server{})
+	go s.Serve(lis)
+	t.Cleanup(s.Stop)
+	conn, err := grpc.NewClient(lis.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	stream, err := pb.NewTetrisClient(conn).PlayMoves(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stream.Send(&pb.MoveRequest{Action: &pb.MoveRequest_Start{Start: &pb.Reset{Seed: 1}}})
+	res, err := stream.Recv()
+	if err != nil || len(res.Moves) == 0 || len(res.Moves) > MaxMoves {
+		t.Fatalf("reset: %v, %d moves", err, len(res.Moves))
+	}
+	for _, m := range res.Moves {
+		if len(m.Features) != agent.NumMoveFeatures {
+			t.Fatalf("%d features, want %d", len(m.Features), agent.NumMoveFeatures)
+		}
+	}
+	for i := 0; i < 200 && !res.State.Done; i++ { // play the last move each time, including holds and slides
+		stream.Send(&pb.MoveRequest{Action: &pb.MoveRequest_Move{Move: int32(len(res.Moves) - 1)}})
+		if res, err = stream.Recv(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stream.Send(&pb.MoveRequest{Action: &pb.MoveRequest_Move{Move: int32(len(res.Moves))}})
+	if _, err := stream.Recv(); status.Code(err) != codes.InvalidArgument {
+		t.Errorf("out-of-range move: %v, want InvalidArgument", err)
 	}
 }
