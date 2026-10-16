@@ -331,11 +331,24 @@ func (a *app) drawBoard(screen *ebiten.Image) {
 			}
 		}
 	}
-	drawPreview(screen, "next", boardX, st.Next)
+	drawQueue(screen, st.Preview)
 	if st.HasHold {
-		drawPreview(screen, "hold", boardX+110, st.Hold)
+		drawPreview(screen, "hold", boardX, st.Hold)
 	} else {
-		ebitenutil.DebugPrintAt(screen, "hold", boardX+110, boardY+engine.VisibleHeight*cell+8)
+		ebitenutil.DebugPrintAt(screen, "hold", boardX, boardY+engine.VisibleHeight*cell+8)
+	}
+}
+
+// drawQueue draws the upcoming pieces in a column right of the board, the next one on top.
+func drawQueue(screen *ebiten.Image, queue [engine.PreviewSize]engine.Kind) {
+	const x, y0, c, step = boardX + engine.Width*cell + 12, boardY + 16, 11, 34 // c: preview cell size
+	ebitenutil.DebugPrintAt(screen, "next", x, boardY)
+	for i, k := range queue {
+		cells := nextCells(k)
+		minY := min(cells[0].Y, cells[1].Y, cells[2].Y, cells[3].Y)
+		for _, p := range cells {
+			vector.FillRect(screen, float32(x+p.X*c), float32(y0+i*step+(1-(p.Y-minY))*c), c-1, c-1, kindColors[k], false)
+		}
 	}
 }
 
