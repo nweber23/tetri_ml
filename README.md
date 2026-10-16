@@ -11,7 +11,7 @@ A Tetris engine written in Go, a reinforcement learning agent trained with PyTor
 | DQN (mean of 3 training seeds) | 172,673 | 1,179.8 |
 | Double DQN (mean of 3 training seeds) | 173,305 | 1,179.4 |
 
-The write-up, including what did not work, is in [docs/BLOG.md](docs/BLOG.md).
+The write-up, including what did not work, is in [docs/BLOG.md](docs/BLOG.md). A follow-up measurement (clear sizes, score per piece, 10,000-piece cap) is in [docs/ANALYSIS.md](docs/ANALYSIS.md).
 
 ## How it fits together
 
@@ -58,6 +58,7 @@ Baselines, no Python needed:
 
 ```bash
 go run ./cmd/baseline -games 100 -max-pieces 3000   # heuristic
+go run ./cmd/baseline -agent agents/raw.json -games 100 -max-pieces 3000   # an exported network
 go run ./cmd/headless -seed 1                       # one random game
 ```
 
