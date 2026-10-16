@@ -151,6 +151,16 @@ func main() {
 	}
 }
 
+// gifPalette is the UI's own flat colours, so the dark background, grid and pieces stay exact, plus the
+// 216 web-safe colours for everything else (text edges, anti-aliased chart lines). A GIF has 256 colours.
+func gifPalette() color.Palette {
+	exact := []color.Color{background, panel, gridLine, textDim, color.White, color.Black}
+	for _, c := range kindColors {
+		exact = append(exact, c)
+	}
+	return append(exact, palette.WebSafe...)
+}
+
 // capture copies the screen into an image the encoders can read quickly.
 func capture(screen *ebiten.Image) *image.RGBA {
 	b := screen.Bounds()
@@ -274,7 +284,7 @@ func (a *app) Draw(screen *ebiten.Image) {
 		}
 	}
 	if a.recording != nil && a.frame%a.recordEvery == 0 {
-		img := image.NewPaletted(screen.Bounds(), palette.WebSafe)
+		img := image.NewPaletted(screen.Bounds(), gifPalette())
 		draw.Draw(img, img.Bounds(), capture(screen), image.Point{}, draw.Src)
 		a.recording.Image = append(a.recording.Image, img)
 		a.recording.Delay = append(a.recording.Delay, a.recordEvery*100/60)
